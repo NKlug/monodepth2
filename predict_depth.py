@@ -8,12 +8,13 @@ import datasets
 import networks
 from evaluate_depth import batch_post_process_disparity
 from layers import disp_to_depth
+from options import MonodepthOptions
 from utils import readlines
 
 splits_dir = os.path.join(os.path.dirname(__file__), "splits")
 
 
-def predict_depth(data, opt):
+def predict_depth(opt):
     """
     Predict depth maps for given input images.
     :param data:
@@ -33,7 +34,11 @@ def predict_depth(data, opt):
 
     encoder_dict = torch.load(encoder_path)
 
+    filenames = readlines(os.path.join(splits_dir, options.eval_split, "test_files.txt"))
     # noinspection DuplicatedCode
+    data = datasets.KITTIRAWDataset(options.data_path, filenames,
+                                    encoder_dict['height'], encoder_dict['width'],
+                                    [0], 4, is_train=False)
     dataloader = DataLoader(data, 16, shuffle=False, num_workers=opt.num_workers,
                             pin_memory=True, drop_last=False)
 
@@ -82,3 +87,26 @@ def predict_depth(data, opt):
         np.save(output_path, pred_disps)
 
     return pred_disps
+
+
+if __name__ == '__main__':
+    options = MonodepthOptions()
+    options = options.parse()
+
+    pred_depths = predict_depth(options)
+
+    # import matplotlib as mpl
+    # import matplotlib.cm as cm
+    # import PIL.Image as pil
+    #
+    # pred_depth = pred_depths[0]
+    # disp_resized_np = pred_depth
+    # vmax = np.percentile(disp_resized_np, 95)
+    # normalizer = mpl.colors.Normalize(vmin=disp_resized_np.min(), vmax=vmax)
+    # mapper = cm.ScalarMappable(norm=normalizer, cmap='magma')
+    # colormapped_im = (mapper.to_rgba(disp_resized_np)[:, :, :3] * 255).astype(np.uint8)
+    # im = pil.fromarray(colormapped_im)
+    # name_dest_im = os.path.join('splits', options.eval_split, "{}_disp.jpeg".format('sequence_test'))
+    # im.save(name_dest_im)
+
+    pass

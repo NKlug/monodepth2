@@ -46,6 +46,18 @@ class KITTIDataset(MonoDataset):
 
         return os.path.isfile(velo_filename)
 
+    def check_oxts(self):
+        line = self.filenames[0].split()
+        scene_name = line[0]
+        frame_index = int(line[1])
+
+        velo_filename = os.path.join(
+            self.data_path,
+            scene_name,
+            "oxts/data/{:010d}.bin".format(int(frame_index)))
+
+        return os.path.isfile(velo_filename)
+
     def get_color(self, folder, frame_index, side, do_flip):
         color = self.loader(self.get_image_path(folder, frame_index, side))
 
@@ -83,6 +95,18 @@ class KITTIRAWDataset(KITTIDataset):
             depth_gt = np.fliplr(depth_gt)
 
         return depth_gt
+
+    def get_oxts(self, folder, frame_index):
+        calib_path = os.path.join(self.data_path, folder.split("/")[0])
+
+        oxts_file_name = os.path.join(
+            self.data_path,
+            folder,
+            "oxts/data/{:010d}.bin".format(int(frame_index)))
+
+        oxts_data = load_oxts(calib_path, oxts_file_name)
+
+        return oxts_data
 
 
 class KITTIOdomDataset(KITTIDataset):

@@ -96,3 +96,8 @@ def generate_depth_map(calib_dir, velo_filename, cam=2, vel_depth=False):
     depth[depth < 0] = 0
 
     return depth
+
+
+def load_oxts(calib_dir, oxts_filename, cam=2):
+    """Generate absolute camera coordinates from oxts data
+    """

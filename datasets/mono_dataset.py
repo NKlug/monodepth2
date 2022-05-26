@@ -119,6 +119,7 @@ class MonoDataset(data.Dataset):
 
             ("color", <frame_id>, <scale>)          for raw colour images,
             ("color_aug", <frame_id>, <scale>)      for augmented colour images,
+            ("oxts", <frame_id<)                    for oxts data,
             ("K", scale) or ("inv_K", scale)        for camera intrinsics,
             "stereo_T"                              for camera extrinsics, and
             "depth_gt"                              for ground truth depth maps.
@@ -159,6 +160,9 @@ class MonoDataset(data.Dataset):
                 inputs[("color", i, -1)] = self.get_color(folder, frame_index, other_side, do_flip)
             else:
                 inputs[("color", i, -1)] = self.get_color(folder, frame_index + i, side, do_flip)
+
+            if self.check_oxts():
+                inputs[("oxts", i)] = self.get_oxts(folder, frame_index)
 
         # adjusting intrinsics to match each scale in the pyramid
         for scale in range(self.num_scales):
@@ -206,4 +210,10 @@ class MonoDataset(data.Dataset):
         raise NotImplementedError
 
     def get_depth(self, folder, frame_index, side, do_flip):
+        raise NotImplementedError
+
+    def get_oxts(self, folder, frame_index):
+        raise NotImplementedError
+
+    def check_oxts(self):
         raise NotImplementedError
