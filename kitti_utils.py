@@ -98,6 +98,34 @@ def generate_depth_map(calib_dir, velo_filename, cam=2, vel_depth=False):
     return depth
 
 
+def get_absolute_camera_orientation(calib_dir, oxts_data, cam=2):
+    """
+    Computes absolute camera orientation from oxts data
+    """
+    # load calibration files
+    imu2velo = read_calib_file(os.path.join(calib_dir, 'calib_imu_to_velo.txt'))
+    cam2cam = read_calib_file(os.path.join(calib_dir, 'calib_cam_to_cam.txt'))
+    velo2cam = read_calib_file(os.path.join(calib_dir, 'calib_velo_to_cam.txt'))
+
+    velo2cam = np.hstack((velo2cam['R'].reshape(3, 3), velo2cam['T'][..., np.newaxis]))
+    velo2cam = np.vstack((velo2cam, np.array([0, 0, 0, 1.0])))
+
+    imu2velo = np.hstack((imu2velo['R'].reshape(3, 3), imu2velo['T'][..., np.newaxis]))
+    imu2velo = np.vstack((imu2velo, np.array([0, 0, 0, 1.0])))
+
+    # get imu orientation -> compensate for pitch
+    # TODO
+
+    # compute projection matrix imu->image plane
+    R_cam2rect = np.eye(4)
+    R_cam2rect[:3, :3] = cam2cam['R_rect_00'].reshape(3, 3)
+    P_rect = cam2cam['P_rect_0' + str(cam)].reshape(3, 4)
+    P_velo2im = np.dot(np.dot(P_rect, R_cam2rect), velo2cam)
+    P_imu2im = np.dot(P_velo2im, imu2velo)
+
+    return P_imu2im
+
+
 def load_oxts(calib_dir, oxts_filename, cam=2):
     """Generate absolute camera coordinates from oxts data
     """
