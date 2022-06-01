@@ -11,13 +11,14 @@ import skimage.transform
 import numpy as np
 import PIL.Image as pil
 
-from kitti_utils import generate_depth_map
+from kitti_utils import generate_depth_map, load_oxts
 from .mono_dataset import MonoDataset
 
 
 class KITTIDataset(MonoDataset):
     """Superclass for different types of KITTI dataset loaders
     """
+
     def __init__(self, *args, **kwargs):
         super(KITTIDataset, self).__init__(*args, **kwargs)
 
@@ -51,12 +52,12 @@ class KITTIDataset(MonoDataset):
         scene_name = line[0]
         frame_index = int(line[1])
 
-        velo_filename = os.path.join(
+        oxts_filename = os.path.join(
             self.data_path,
             scene_name,
-            "oxts/data/{:010d}.bin".format(int(frame_index)))
+            "oxts/data/{:010d}.txt".format(int(frame_index)))
 
-        return os.path.isfile(velo_filename)
+        return os.path.isfile(oxts_filename)
 
     def get_color(self, folder, frame_index, side, do_flip):
         color = self.loader(self.get_image_path(folder, frame_index, side))
@@ -66,10 +67,23 @@ class KITTIDataset(MonoDataset):
 
         return color
 
+    def get_oxts(self, folder, frame_index):
+        calib_path = os.path.join(self.data_path, folder.split("/")[0])
+
+        oxts_file_name = os.path.join(
+            self.data_path,
+            folder,
+            "oxts/data/{:010d}.txt".format(int(frame_index)))
+
+        oxts_data = load_oxts(calib_path, oxts_file_name)
+
+        return oxts_data
+
 
 class KITTIRAWDataset(KITTIDataset):
     """KITTI dataset which loads the original velodyne depth maps for ground truth
     """
+
     def __init__(self, *args, **kwargs):
         super(KITTIRAWDataset, self).__init__(*args, **kwargs)
 
@@ -96,22 +110,11 @@ class KITTIRAWDataset(KITTIDataset):
 
         return depth_gt
 
-    def get_oxts(self, folder, frame_index):
-        calib_path = os.path.join(self.data_path, folder.split("/")[0])
-
-        oxts_file_name = os.path.join(
-            self.data_path,
-            folder,
-            "oxts/data/{:010d}.bin".format(int(frame_index)))
-
-        oxts_data = load_oxts(calib_path, oxts_file_name)
-
-        return oxts_data
-
 
 class KITTIOdomDataset(KITTIDataset):
     """KITTI dataset for odometry training and testing
     """
+
     def __init__(self, *args, **kwargs):
         super(KITTIOdomDataset, self).__init__(*args, **kwargs)
 
@@ -128,6 +131,7 @@ class KITTIOdomDataset(KITTIDataset):
 class KITTIDepthDataset(KITTIDataset):
     """KITTI dataset which uses the updated ground truth depth maps
     """
+
     def __init__(self, *args, **kwargs):
         super(KITTIDepthDataset, self).__init__(*args, **kwargs)
 
