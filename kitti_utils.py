@@ -40,7 +40,7 @@ def sub2ind(matrixSize, rowSub, colSub):
     """Convert row, col matrix subscripts to linear indices
     """
     m, n = matrixSize
-    return rowSub * (n-1) + colSub - 1
+    return rowSub * (n - 1) + colSub - 1
 
 
 def generate_depth_map(calib_dir, velo_filename, cam=2, vel_depth=False):
@@ -58,7 +58,7 @@ def generate_depth_map(calib_dir, velo_filename, cam=2, vel_depth=False):
     # compute projection matrix velodyne->image plane
     R_cam2rect = np.eye(4)
     R_cam2rect[:3, :3] = cam2cam['R_rect_00'].reshape(3, 3)
-    P_rect = cam2cam['P_rect_0'+str(cam)].reshape(3, 4)
+    P_rect = cam2cam['P_rect_0' + str(cam)].reshape(3, 4)
     P_velo2im = np.dot(np.dot(P_rect, R_cam2rect), velo2cam)
 
     # load velodyne points and remove all behind image plane (approximation)
@@ -101,3 +101,10 @@ def generate_depth_map(calib_dir, velo_filename, cam=2, vel_depth=False):
 def load_oxts(calib_dir, oxts_filename, cam=2):
     """Generate absolute camera coordinates from oxts data
     """
+    file_name = os.path.join(calib_dir, oxts_filename)
+    data = np.fromfile(file_name, sep=' ', dtype=np.float32)
+    dict_names = ['lat', 'lon', 'alt', 'roll', 'pitch', 'yaw', 'vn', 've', 'vf', 'vl', 'vu', 'ax', 'ay', 'az', 'af',
+                  'al', 'au', 'wx', 'wy', 'wz', 'wf', 'wl', 'wu', 'pos_accuracy', 'vel_accuracy', 'navstat', 'numsats',
+                  'posmode', 'velmode', 'orimode']
+    data = {d: data[i] for i, d in enumerate(dict_names)}
+    return data
