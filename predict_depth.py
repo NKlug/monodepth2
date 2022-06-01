@@ -10,6 +10,7 @@ from evaluate_depth import batch_post_process_disparity
 from layers import disp_to_depth
 from options import MonodepthOptions
 from utils import readlines
+import pickle
 
 splits_dir = os.path.join(os.path.dirname(__file__), "splits")
 
@@ -28,7 +29,6 @@ def predict_depth(opt):
 
     print("-> Loading weights from {}".format(opt.load_weights_folder))
 
-    # filenames = readlines(os.path.join(splits_dir, opt.eval_split, "test_files.txt"))
     encoder_path = os.path.join(opt.load_weights_folder, "encoder.pth")
     decoder_path = os.path.join(opt.load_weights_folder, "depth.pth")
 
@@ -55,6 +55,7 @@ def predict_depth(opt):
     depth_decoder.eval()
 
     pred_disps = []
+    inv_Ks = []
 
     print("-> Computing predictions with size {}x{}".format(
         encoder_dict['width'], encoder_dict['height']))
@@ -71,22 +72,28 @@ def predict_depth(opt):
 
             pred_disp, _ = disp_to_depth(output[("disp", 0)], opt.min_depth, opt.max_depth)
             pred_disp = pred_disp.cpu()[:, 0].numpy()
+            inv_K = data[("inv_K", 0)].cpu().numpy()
 
             if opt.post_process:
                 N = pred_disp.shape[0] // 2
                 pred_disp = batch_post_process_disparity(pred_disp[:N], pred_disp[N:, :, ::-1])
 
             pred_disps.append(pred_disp)
+            inv_Ks.append(inv_K)
 
     pred_disps = np.concatenate(pred_disps)
+    inv_Ks = np.concatenate(inv_Ks)
+
+    outputs = {"depth": pred_disps, "inv_K": inv_Ks}
 
     if opt.save_pred_disps:
         output_path = os.path.join(
-            opt.load_weights_folder, "disps_{}_split.npy".format(opt.eval_split))
+            opt.load_weights_folder, "predicted_depths_{}_split.pkl".format(opt.eval_split))
         print("-> Saving predicted disparities to ", output_path)
-        np.save(output_path, pred_disps)
+        with open(output_path, 'wb') as out_file:
+            pickle.dump(outputs, out_file)
 
-    return pred_disps
+    return outputs
 
 
 if __name__ == '__main__':
