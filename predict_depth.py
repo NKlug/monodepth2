@@ -55,7 +55,9 @@ def predict_depth(opt):
     depth_decoder.eval()
 
     pred_disps = []
+    pred_depths = []
     inv_Ks = []
+    oxts_list = []
 
     print("-> Computing predictions with size {}x{}".format(
         encoder_dict['width'], encoder_dict['height']))
@@ -69,22 +71,33 @@ def predict_depth(opt):
                 input_color = torch.cat((input_color, torch.flip(input_color, [3])), 0)
 
             output = depth_decoder(encoder(input_color))
-
-            pred_disp, _ = disp_to_depth(output[("disp", 0)], opt.min_depth, opt.max_depth)
+            pred_disp, pred_depth = disp_to_depth(output[("disp", 0)], opt.min_depth, opt.max_depth)
             pred_disp = pred_disp.cpu()[:, 0].numpy()
+            pred_depth = pred_depth.cpu()[:, 0].numpy()
             inv_K = data[("inv_K", 0)].cpu().numpy()
+            oxts = data[("oxts", 0)]
 
             if opt.post_process:
                 N = pred_disp.shape[0] // 2
                 pred_disp = batch_post_process_disparity(pred_disp[:N], pred_disp[N:, :, ::-1])
 
             pred_disps.append(pred_disp)
+            pred_depths.append(pred_depth)
             inv_Ks.append(inv_K)
+            oxts_list.append(oxts)
 
     pred_disps = np.concatenate(pred_disps)
+    pred_depths = np.concatenate(pred_depths)
     inv_Ks = np.concatenate(inv_Ks)
 
-    outputs = {"depth": pred_disps, "inv_K": inv_Ks}
+    oxts_list = {key: np.concatenate([value[key] for value in oxts_list]) for key in oxts_list[0]}
+
+    outputs = {
+        "depth": pred_depths,
+        "disp": pred_disps,
+        "inv_K": inv_Ks,
+        "oxts": oxts_list
+    }
 
     if opt.save_pred_disps:
         output_path = os.path.join(
@@ -101,19 +114,4 @@ if __name__ == '__main__':
     options = options.parse()
 
     pred_depths = predict_depth(options)
-
-    # import matplotlib as mpl
-    # import matplotlib.cm as cm
-    # import PIL.Image as pil
-    #
-    # pred_depth = pred_depths[0]
-    # disp_resized_np = pred_depth
-    # vmax = np.percentile(disp_resized_np, 95)
-    # normalizer = mpl.colors.Normalize(vmin=disp_resized_np.min(), vmax=vmax)
-    # mapper = cm.ScalarMappable(norm=normalizer, cmap='magma')
-    # colormapped_im = (mapper.to_rgba(disp_resized_np)[:, :, :3] * 255).astype(np.uint8)
-    # im = pil.fromarray(colormapped_im)
-    # name_dest_im = os.path.join('splits', options.eval_split, "{}_disp.jpeg".format('sequence_test'))
-    # im.save(name_dest_im)
-
     pass
