@@ -3,6 +3,7 @@ import os
 from torch.utils.data import DataLoader
 
 import datasets
+import networks
 from kitti_utils import get_absolute_camera_orientation
 from utils import readlines
 import torch
@@ -22,6 +23,9 @@ splits_dir = os.path.join(os.path.dirname(__file__), "splits")
 
 
 def back_project_depths(data, opt):
+    """
+    Compute 3d coordinates by perspective re-projection using the 2d coordinates and estimated depths.
+    """
     # back-project as during training
     depths = data["depth"]
     h, w = depths.shape[1:]
@@ -43,6 +47,55 @@ def back_project_depths(data, opt):
 
     data["cam_points"] = cam_points
     return data
+
+
+def estimate_relative_pose(image1, image2, opt):
+    """
+    Estimate relative camera pose between images using the pose network with learned weights.
+    """
+    opt.load_weights_folder = os.path.expanduser(opt.load_weights_folder)
+
+    assert os.path.isdir(opt.load_weights_folder), \
+        "Cannot find a folder at {}".format(opt.load_weights_folder)
+
+    print("-> Loading weights from {}".format(opt.load_weights_folder))
+
+    pose_encoder_path = os.path.join(opt.load_weights_folder, "pose_encoder.pth")
+    pose_decoder_path = os.path.join(opt.load_weights_folder, "pose.pth")
+
+    pose_encoder_dict = torch.load(pose_encoder_path)
+
+    filenames = readlines(os.path.join(splits_dir, opt.eval_split, "test_files.txt"))
+    # noinspection DuplicatedCode
+    data = datasets.KITTIRAWDataset(options.data_path, filenames,
+                                    pose_encoder_dict['height'], pose_encoder_dict['width'],
+                                    [0], 4, is_train=False)
+    dataloader = DataLoader(data, 16, shuffle=False, num_workers=opt.num_workers,
+                            pin_memory=True, drop_last=False)
+
+    pose_encoder = networks.ResnetEncoder(opt.num_layers, False)
+    pose_decoder = networks.PoseDecoder(pose_encoder.num_ch_enc, num_input_features=1, num_frames_to_predict_for=2)
+
+    model_dict = pose_encoder.state_dict()
+    pose_encoder.load_state_dict({k: v for k, v in pose_encoder_dict.items() if k in model_dict})
+    pose_decoder.load_state_dict(torch.load(pose_decoder_path))
+
+    pose_encoder.cuda()
+    pose_encoder.eval()
+    pose_decoder.cuda()
+    pose_decoder.eval()
+
+
+
+    pose_inputs = [pose_encoder(torch.cat(pose_inputs, 1))]
+
+    axisangle, translation = self.models["pose"](pose_inputs)
+    outputs[("axisangle", 0, f_i)] = axisangle
+    outputs[("translation", 0, f_i)] = translation
+
+    # Invert the matrix if the frame id is negative
+    outputs[("cam_T_cam", 0, f_i)] = transformation_from_parameters(
+        axisangle[:, 0], translation[:, 0], invert=(f_i < 0))
 
 
 def get_camera_rotation_matrix(oxts):
@@ -77,21 +130,18 @@ def compute_3d_coordinates(predicted_depth, f=5, interim_downscale=4):
     # zv = predicted_depth[2, ...]
 
     zv = predicted_depth
-    image_coords = predicted_depth[:2, ...]
-
-    calib_dir = '/home/nikolas/Datasets/kitti_data/'
-
-    P = get_absolute_camera_orientation(calib_dir, None)
     coordinates_3d = np.stack([xv.flatten(), yv.flatten(), zv.flatten()], axis=-1)
-    for i in range(len(coordinates_3d)):
-        coordinates_3d[i] = np.dot(P, np.concatenate([coordinates_3d[i], np.ones((1,))]).T).T
+
+    # calib_dir = '/home/nikolas/Datasets/kitti_data/'
+    # P = get_absolute_camera_orientation(calib_dir, None)
+    # for i in range(len(coordinates_3d)):
+    #     coordinates_3d[i] = np.dot(P, np.concatenate([coordinates_3d[i], np.ones((1,))]).T).T
 
     coordinates_3d = coordinates_3d.reshape((h, w, 3))
     return coordinates_3d
 
 
-def visualize_sequence(data, absolute_coordinates):
-    # predicted_depths = data["cam_points"][:1]
+def visualize_single_step(data):
     predicted_depths = data["disp"][:1]
 
     coords = []
@@ -177,7 +227,6 @@ def visualize_sequence(data, absolute_coordinates):
 
     plt.show()
 
-
     # fig.show()
 
     pass
@@ -199,4 +248,4 @@ if __name__ == '__main__':
 
     # data = back_project_depths(data, opt)
 
-    visualize_sequence(data, camera_coordinates)
+    simple_visualize_sequence(data)

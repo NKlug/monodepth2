@@ -1,0 +1,58 @@
+import numpy as np
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+import matplotlib.animation as animation
+import matplotlib.cm as cm
+
+from visualization.visualize_sequence import compute_3d_coordinates
+
+
+class Visualizer():
+
+    def __init__(self, data):
+        pass
+
+    def simple_visualize_sequence(self,):
+        predicted_depths = self.data["disp"]
+
+        coords = []
+        for predicted_depth in predicted_depths:
+            coords_3d = compute_3d_coordinates(predicted_depth, interim_downscale=8)
+            coords.append(coords_3d)
+
+        coords = np.asarray(coords)
+
+        fig = plt.figure(figsize=(20, 10))
+        fig.tight_layout()
+        ax = fig.add_subplot(111, projection='3d', proj_type='persp')
+
+        def next_scatter(num, coords):
+            xv = coords[num, :, :, 0]
+            yv = coords[num, :, :, 1]
+            zv = coords[num, :, :, 2]
+            vmax = np.percentile(zv, 95)
+            normalizer = mpl.colors.Normalize(vmin=zv.min(), vmax=vmax)
+            mapper = cm.ScalarMappable(norm=normalizer, cmap='magma')
+            colormapped_im = mapper.to_rgba(zv)[:, :, :3]
+            ax.clear()
+            ax.set_xlabel('X')
+            ax.set_ylabel('Y')
+            ax.set_zlabel('Z')
+            scattered = ax.scatter(xv.flatten(), yv.flatten(), zv.flatten(), s=200, c=colormapped_im.reshape((-1, 3)))
+            # scattered = ax.plot_surface(xv, yv, zv, cmap='coolwarm', linewidth=1, antialiased=True)
+            # MAX = 5
+            # for direction in (-1, 1):
+            #     for point in np.diag(direction * MAX * np.array([1, 1, 1])):
+            #         ax.plot([point[0]], [point[1]], [point[2]], 'w')
+
+            # scattered = ax.scatter(xv.flatten(), yv.flatten(), zv.flatten(), s=2)
+            # for line, data in zip(lines, dataLines):
+            #     # NOTE: there is no .set_data() for 3 dim data...
+            #     line.set_data(data[0:2, :num])
+            #     line.set_3d_properties(data[2, :num])
+            # scatter_plots[num-1].set_visible(False)
+            # scatter_plots[num].set_visible(True)
+
+        line_ani = animation.FuncAnimation(fig, next_scatter, len(coords), fargs=(coords,), interval=100, blit=False)
+        plt.show()
