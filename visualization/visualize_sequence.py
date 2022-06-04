@@ -5,6 +5,7 @@ from torch.utils.data import DataLoader
 import datasets
 import networks
 from kitti_utils import get_absolute_camera_orientation
+from trainer import Trainer
 from utils import readlines
 import torch
 import numpy as np
@@ -49,53 +50,6 @@ def back_project_depths(data, opt):
     return data
 
 
-def estimate_relative_pose(image1, image2, opt):
-    """
-    Estimate relative camera pose between images using the pose network with learned weights.
-    """
-    opt.load_weights_folder = os.path.expanduser(opt.load_weights_folder)
-
-    assert os.path.isdir(opt.load_weights_folder), \
-        "Cannot find a folder at {}".format(opt.load_weights_folder)
-
-    print("-> Loading weights from {}".format(opt.load_weights_folder))
-
-    pose_encoder_path = os.path.join(opt.load_weights_folder, "pose_encoder.pth")
-    pose_decoder_path = os.path.join(opt.load_weights_folder, "pose.pth")
-
-    pose_encoder_dict = torch.load(pose_encoder_path)
-
-    filenames = readlines(os.path.join(splits_dir, opt.eval_split, "test_files.txt"))
-    # noinspection DuplicatedCode
-    data = datasets.KITTIRAWDataset(options.data_path, filenames,
-                                    pose_encoder_dict['height'], pose_encoder_dict['width'],
-                                    [0], 4, is_train=False)
-    dataloader = DataLoader(data, 16, shuffle=False, num_workers=opt.num_workers,
-                            pin_memory=True, drop_last=False)
-
-    pose_encoder = networks.ResnetEncoder(opt.num_layers, False)
-    pose_decoder = networks.PoseDecoder(pose_encoder.num_ch_enc, num_input_features=1, num_frames_to_predict_for=2)
-
-    model_dict = pose_encoder.state_dict()
-    pose_encoder.load_state_dict({k: v for k, v in pose_encoder_dict.items() if k in model_dict})
-    pose_decoder.load_state_dict(torch.load(pose_decoder_path))
-
-    pose_encoder.cuda()
-    pose_encoder.eval()
-    pose_decoder.cuda()
-    pose_decoder.eval()
-
-
-
-    pose_inputs = [pose_encoder(torch.cat(pose_inputs, 1))]
-
-    axisangle, translation = self.models["pose"](pose_inputs)
-    outputs[("axisangle", 0, f_i)] = axisangle
-    outputs[("translation", 0, f_i)] = translation
-
-    # Invert the matrix if the frame id is negative
-    outputs[("cam_T_cam", 0, f_i)] = transformation_from_parameters(
-        axisangle[:, 0], translation[:, 0], invert=(f_i < 0))
 
 
 def get_camera_rotation_matrix(oxts):
@@ -230,22 +184,3 @@ def visualize_single_step(data):
     # fig.show()
 
     pass
-
-
-if __name__ == '__main__':
-    options = MonodepthOptions()
-    opt = options.parse()
-
-    output_path = os.path.join(
-        opt.load_weights_folder, "predicted_depths_{}_split.pkl".format(opt.eval_split))
-    print("-> Loading predicted depths from ", output_path)
-    with open(output_path, 'rb') as f:
-        data = pickle.load(f)
-
-    camera_coordinates = [(0, 0, 1, 0, 0, 0)]
-
-    # data = {"disp": np.load('/home/nikolas/Projects/monodepth2/assets/test_image_disp.npy')[:, 0]}
-
-    # data = back_project_depths(data, opt)
-
-    simple_visualize_sequence(data)

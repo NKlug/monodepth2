@@ -1,6 +1,7 @@
 from options import MonodepthOptions
 import os
 import pickle
+import numpy as np
 
 from visualization.visualizer import Visualizer
 
@@ -22,4 +23,6 @@ if __name__ == '__main__':
         # data = back_project_depths(data, opt)
         visualizer = Visualizer(data)
         # visualizer.simple_visualize_sequence()
-        visualizer.visualize_with_steps()
+        # visualizer.visualize_with_steps()
+        # visualizer.visualize_camera_path()
+        visualizer._plot_camera(np.asarray([0, 0, 0]), [0, 0, np.pi/2])
