@@ -27,10 +27,10 @@ class Visualizer:
         lat, lon = lat_lon_to_meters(lat, lon)
         lat = lat - lat[0]
         lon = lon - lon[0]
-        alt = alt - alt[0]
+        alt = alt - alt[0] + 1
 
-        self.ax.plot(lat, lon, 0 * alt + 1)
-        plt.show()
+        self.ax.plot(lat, lon, alt)
+        return lat, lon, alt
 
     def _plot_camera(self, position, orientation, scale=1):
         """
@@ -42,6 +42,8 @@ class Visualizer:
         rb = [4, 1, 0]
         c = [2, 0, 1.5]
         corners = np.stack([lu, ru, lb, rb, c], axis=0)
+        # put center of image plane at (0, 0) and normalize
+        corners = (corners - np.asarray([2, 1, 1.5])) / 4
 
         rot = spat.transform.Rotation.from_euler('xyz', orientation).as_matrix()
 
@@ -52,7 +54,6 @@ class Visualizer:
         lines_to_plot = np.asarray(lines_to_plot)
         for line in lines_to_plot:
             self.ax.plot(line[:, 0], line[:, 1], line[:, 2], color='black')
-        plt.show()
 
 
     def visualize_with_steps(self):
@@ -62,7 +63,11 @@ class Visualizer:
         """
         coords = self._compute_3d_coordinates()
 
-        self.visualize_camera_path()
+        lat, lon, alt = self.visualize_camera_path()
+
+        roll = self.data['oxts']['roll']
+        pitch = self.data['oxts']['pitch']
+        yaw = self.data['oxts']['yaw']
 
         def on_press(event):
             if event is not None:
@@ -71,20 +76,35 @@ class Visualizer:
                 elif event.key == '-':
                     on_press.num = (on_press.num - 1) % len(coords)
 
-            xv = coords[on_press.num, :, :, 0]
-            yv = coords[on_press.num, :, :, 1]
-            zv = coords[on_press.num, :, :, 2]
+            # self.ax.clear()
 
-            vmax = np.percentile(zv, 95)
-            normalizer = mpl.colors.Normalize(vmin=zv.min(), vmax=vmax)
-            mapper = cm.ScalarMappable(norm=normalizer, cmap='magma')
-            colormapped_im = mapper.to_rgba(zv)[:, :, :3]
+            i = on_press.num
 
-            self.ax.clear()
-            self.ax.set_xlabel('X')
-            self.ax.set_ylabel('Y')
-            self.ax.set_zlabel('Z')
-            self.ax.scatter(xv.flatten(), yv.flatten(), zv.flatten(), s=200, c=colormapped_im.reshape((-1, 3)))
+            # plot camera
+            position = np.asarray([lat[i], lon[i], alt[i]])
+            orientation = np.asarray([roll[i], pitch[i], yaw[i] - np.pi/2])
+
+            self._plot_camera(position, orientation)
+
+            MAX = 50
+            for direction in (-1, 1):
+                for point in np.diag(direction * MAX * np.array([1, 1, 1])):
+                    self.ax.plot([point[0]], [point[1]], [point[2]], 'green')
+
+            # plot image
+            # xv = coords[on_press.num, :, :, 0]
+            # yv = coords[on_press.num, :, :, 1]
+            # zv = coords[on_press.num, :, :, 2]
+            # vmax = np.percentile(zv, 95)
+            # normalizer = mpl.colors.Normalize(vmin=zv.min(), vmax=vmax)
+            # mapper = cm.ScalarMappable(norm=normalizer, cmap='magma')
+            # colormapped_im = mapper.to_rgba(zv)[:, :, :3]
+            #
+            # self.ax.clear()
+            # self.ax.set_xlabel('X')
+            # self.ax.set_ylabel('Y')
+            # self.ax.set_zlabel('Z')
+            # self.ax.scatter(xv.flatten(), yv.flatten(), zv.flatten(), s=200, c=colormapped_im.reshape((-1, 3)))
             self.fig.canvas.draw()
 
         on_press.num = 0
@@ -93,6 +113,9 @@ class Visualizer:
         plt.show()
 
     def _compute_3d_coordinates(self):
+        """
+        Compute 3d coordinates from predicted depth and camera intrinsics in meters.
+        """
         predicted_depths = self.data["disp"]
 
         coords = []
