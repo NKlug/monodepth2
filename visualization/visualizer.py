@@ -33,23 +33,23 @@ class Visualizer:
         """
         Plots a camera model at the given position oriented towards the given orientation vector (roll, pitch, yaw)
         """
-        lu = [0, 1, 1]
-        ru = [4, 1, 1]
+        lu = [0, 1, 3]
+        ru = [4, 1, 3]
         lb = [0, 1, 0]
         rb = [4, 1, 0]
-        c = [2, 0, 2]
+        c = [2, 0, 1.5]
         corners = np.stack([lu, ru, lb, rb, c], axis=0)
 
         rot = spat.transform.Rotation.from_euler('xyz', orientation).as_matrix()
 
         corners = scale * (rot @ corners.T).T + np.repeat(position[np.newaxis, :], 5, axis = 0)
 
-        self.ax.plot([lu, lb])
-        self.ax.plot([lb, rb])
-        self.ax.plot([rb, ru])
-        self.ax.plot([ru, lu])
-
-        self.ax.plot([])
+        lu, ru, lb, rb, c = corners
+        lines_to_plot = [[lu, lb], [lb, rb], [rb, ru], [ru, lu], [lu, c], [ru, c], [lb, c], [rb, c]]
+        lines_to_plot = np.asarray(lines_to_plot)
+        for line in lines_to_plot:
+            self.ax.plot(line[:, 0], line[:, 1], line[:, 2], color='black')
+        plt.show()
 
 
     def visualize_with_steps(self):
