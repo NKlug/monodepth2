@@ -6,6 +6,7 @@ import matplotlib.animation as animation
 import matplotlib.cm as cm
 import scipy.spatial as spat
 
+from utils import lat_lon_to_meters
 from visualization.visualize_sequence import compute_3d_coordinates
 
 
@@ -22,6 +23,8 @@ class Visualizer:
         lat = self.data['oxts']['lat']
         lon = self.data['oxts']['lon']
         alt = self.data['oxts']['alt']
+
+        lat, lon = lat_lon_to_meters(lat, lon)
         lat = lat - lat[0]
         lon = lon - lon[0]
         alt = alt - alt[0]
@@ -58,6 +61,8 @@ class Visualizer:
         Press <space> for forward, < - > for backward.
         """
         coords = self._compute_3d_coordinates()
+
+        self.visualize_camera_path()
 
         def on_press(event):
             if event is not None:

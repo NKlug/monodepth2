@@ -9,6 +9,7 @@ import os
 import hashlib
 import zipfile
 from six.moves import urllib
+import numpy as np
 
 
 def readlines(filename):
@@ -80,7 +81,7 @@ def download_model_if_doesnt_exist(model_name):
         "mono+stereo_1024x320":
             ("https://storage.googleapis.com/niantic-lon-static/research/monodepth2/mono%2Bstereo_1024x320.zip",
              "cdc5fc9b23513c07d5b19235d9ef08f7"),
-        }
+    }
 
     if not os.path.exists("models"):
         os.makedirs("models")
@@ -112,3 +113,13 @@ def download_model_if_doesnt_exist(model_name):
             f.extractall(model_path)
 
         print("   Model unzipped to {}".format(model_path))
+
+
+def lat_lon_to_meters(lat, lon):
+    """Computes geodesic distance from the equator at O degrees longitude in meters.
+    From https://stackoverflow.com/questions/639695/how-to-convert-latitude-or-longitude-to-meters"""
+    len_deg_lat = 111320
+    y = lat * len_deg_lat
+    len_deg_lon = 40075000 / 360 * np.cos(lat * np.pi / 180)
+    x = len_deg_lon * lon
+    return x, y
