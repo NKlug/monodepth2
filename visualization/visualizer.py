@@ -137,7 +137,19 @@ class Visualizer:
             scattered = self.ax.scatter(xv.ravel(), yv.ravel(), zv.ravel(), s=200, c=colors.reshape((-1, 3)))
 
         # create animation
-        line_ani = animation.FuncAnimation(self.fig, next_scatter, len(coords), fargs=(coords,), interval=100, blit=False)
+        ani = animation.FuncAnimation(self.fig, next_scatter, len(coords), fargs=(coords,), interval=100, blit=False)
+
+        def on_press(event):
+            if event.key == ' ':
+                if on_press.pause:
+                    ani.event_source.start()
+                else:
+                    ani.event_source.stop()
+                on_press.pause = not on_press.pause
+
+        on_press.pause = False
+        self.fig.canvas.mpl_connect('key_press_event', on_press)
+
         plt.show()
 
     def visualize_single_step(self, step_num):
