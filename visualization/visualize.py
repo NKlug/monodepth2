@@ -22,6 +22,7 @@ if __name__ == '__main__':
 
         # data = back_project_depths(data, opt)
         visualizer = Visualizer(data)
+        # visualizer.visualize_single_step(10)
         visualizer.simple_visualize_sequence()
         # visualizer.visualize_with_steps()
         # visualizer.visualize_camera_path()

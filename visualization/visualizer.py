@@ -139,3 +139,35 @@ class Visualizer:
         # create animation
         line_ani = animation.FuncAnimation(self.fig, next_scatter, len(coords), fargs=(coords,), interval=100, blit=False)
         plt.show()
+
+    def visualize_single_step(self, step_num):
+        """
+        Create simple animation of back projected 3D points without accounting for relative position change.
+        """
+        downscale = 8
+        predicted_depths = self.data['disp']
+        coords = compute_3d_coordinates(self.data, downscale=downscale)
+
+        xv = coords[step_num, :, :, 0]
+        yv = coords[step_num, :, :, 1]
+        zv = coords[step_num, :, :, 2]
+
+        # compute colors
+        color_depths = predicted_depths[step_num]
+        h, w = color_depths.shape[:2]
+        color_depths = cv2.resize(color_depths, (w // downscale, h // downscale))
+        colors = self.compute_coloring(color_depths)
+
+        # add bouding points for equal axes scales
+        MAX = 2
+        for direction in (-1, 1):
+            for point in np.diag(direction * MAX * np.array([1, 1, 1])):
+                self.ax.plot([point[0]], [point[1]], [point[2]], 'green')
+
+        # plot data
+        self.ax.set_xlabel('X')
+        self.ax.set_ylabel('Y')
+        self.ax.set_zlabel('Z')
+        scattered = self.ax.scatter(xv.ravel(), yv.ravel(), zv.ravel(), s=200, c=colors.reshape((-1, 3)))
+
+        plt.show()
