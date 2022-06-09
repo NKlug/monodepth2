@@ -50,6 +50,27 @@ def back_project_depths(data, opt):
     return data
 
 
+def back_project_depth(predicted_depth, inv_K):
+    """
+    Compute 3d coordinates by perspective re-projection using the 2d coordinates and estimated depths.
+    """
+    # back-project as during training
+    h, w = predicted_depth.shape
+    back_project = BackprojectDepth(1, h, w).cpu()
+
+    predicted_depth = predicted_depth[np.newaxis, ...]
+    inv_K = inv_K[np.newaxis, ...]
+
+    with torch.no_grad():
+        depths_batch = torch.from_numpy(predicted_depth).cpu()
+        inv_K_batch = torch.from_numpy(inv_K).cpu()
+        cam_points = back_project(depths_batch, inv_K_batch).cpu().numpy()
+        cam_points = cam_points.reshape((-1, 4, h, w))
+        cam_points = cam_points[:, :3, ...]
+
+    return cam_points[0].T
+
+
 def get_image_to_imu_matrix(calib_dir, cam=2):
     """Compute image to imu homogenous transformation matrix."""
     # load calibration files
@@ -80,140 +101,44 @@ def get_image_to_imu_matrix(calib_dir, cam=2):
     return np.linalg.inv(P_imu2im)
 
 
-def compute_3d_coordinates(predicted_depth, in_imu_coordinates=False, f=5, interim_downscale=4):
+def experimental_compute_3d_coordinates(predicted_depth, inv_K, in_imu_coordinates=False, f=5, interim_downscale=4):
+    orig_w, orig_h = 1242, 375
+
     h, w = predicted_depth.shape[:2]
     predicted_depth = cv2.resize(predicted_depth, (w // interim_downscale, h // interim_downscale))
     h, w = predicted_depth.shape[:2]
-
-    aspect_ratio = h / w
-    x = np.linspace(-1, 1, w)
-    y = np.linspace(-1 * aspect_ratio, 1 * aspect_ratio, h)
+    #
+    x = np.linspace(-orig_w, orig_w, w)
+    y = np.linspace(-orig_h, orig_h, h)
     xv, yv = np.meshgrid(x, y)
 
-    # flip y coordinates
-    yv = yv[::-1]
+    coords_2d = np.stack([xv, yv], axis=-1)
+    coords_3d = np.concatenate([coords_2d, predicted_depth[..., np.newaxis]], axis=-1)
+
+
+    # re-project
+    # xv = f * xv
+    # yv = f * yv
+
+    # re-project as during training
+    # coords_3d = back_project_depth(predicted_depth, inv_K)
+
+    # upscale to original image size
     #
-    # # re-project
-    # # xv = f * xv * predicted_depth
-    # # yv = f * yv * predicted_depth
-    xv = f * xv
-    yv = f * yv
-
-    # xv = predicted_depth[0, ...]
-    # yv = predicted_depth[1, ...]
-    # zv = predicted_depth[2, ...]
-
-    zv = predicted_depth
-    coordinates_3d = np.stack([xv.flatten(), yv.flatten(), zv.flatten()], axis=-1)
-
-    # calib_dir = '/home/nikolas/Datasets/kitti_data/'
-    # P = get_absolute_camera_orientation(calib_dir, None)
-    # for i in range(len(coordinates_3d)):
-    #     coordinates_3d[i] = np.dot(P, np.concatenate([coordinates_3d[i], np.ones((1,))]).T).T
-
-    coordinates_3d = coordinates_3d.reshape((h, w, 3))
+    # coords_3d[:, :, 0] *= orig_w
+    # coords_3d[:, :, 1] *= orig_h
 
     if in_imu_coordinates:
-        coordinates_3d = np.concatenate([coordinates_3d, np.ones((h, w, 1))], axis=-1)
-        coordinates_3d = coordinates_3d.reshape((-1, 4))
+        h, w = coords_3d.shape[:2]
+        coords_3d = np.concatenate([coords_3d, np.ones((h, w, 1))], axis=-1)
+        coords_3d = coords_3d.reshape((-1, 4))
 
         calib_dir = '/home/nikolas/Datasets/kitti_data/'
         M = get_image_to_imu_matrix(calib_dir)
 
         # transform to imu coords
-        coordinates_3d = np.dot(M, coordinates_3d.T).T
+        coords_3d = np.dot(M, coords_3d.T).T
 
-        coordinates_3d = coordinates_3d[:, :3].reshape((h, w, 3))
+        coords_3d = coords_3d[:, :3].reshape((h, w, 3))
 
-    return coordinates_3d
-
-
-def visualize_single_step(data):
-    predicted_depths = data["disp"][:1]
-
-    coords = []
-    for predicted_depth in predicted_depths:
-        coords_3d = compute_3d_coordinates(predicted_depth, interim_downscale=8)
-        coords.append(coords_3d)
-
-    coords = np.asarray(coords)
-
-    fig = plt.figure(figsize=(20, 10))
-    ax = fig.add_subplot(111, projection='3d', proj_type='persp')
-    # ax.set_box_aspect((1, 1, 1))
-    ax.set_xlabel('X Label')
-    ax.set_ylabel('Y Label')
-    ax.set_zlabel('Z Label')
-
-    for i in range(len(coords)):
-        xv = coords[i, :, :, 0]
-        yv = coords[i, :, :, 1]
-        zv = coords[i, :, :, 2]
-        pred_depth = predicted_depths[i]
-        vmax = np.percentile(pred_depth, 95)
-        normalizer = mpl.colors.Normalize(vmin=pred_depth.min(), vmax=vmax)
-        mapper = cm.ScalarMappable(norm=normalizer, cmap='magma')
-        h, w = pred_depth.shape[:2]
-        colormapped_im = mapper.to_rgba(cv2.resize(pred_depth, (w // 8, h // 8)))[:, :, :3]
-        scattered = ax.scatter(xv.flatten(), yv.flatten(), zv.flatten(), s=200, c=colormapped_im.reshape((-1, 3)))
-        MAX = 3
-        for direction in (-1, 1):
-            for point in np.diag(direction * MAX * np.array([1, 1, 1])):
-                ax.plot([point[0]], [point[1]], [point[2]], 'w')
-        #
-        # import plotly
-        # import plotly.graph_objs as go
-        #
-        # # Configure the trace.
-        # trace = go.Scatter3d(
-        #     x=xv.flatten(),  # <-- Put your data instead
-        #     y=yv.flatten(),  # <-- Put your data instead
-        #     z=zv.flatten(),  # <-- Put your data instead
-        #     # color_discrete_sequence=colormapped_im.reshape((-1, 3)),
-        #     mode='markers',
-        #     marker={
-        #         'size': 10,
-        #         'opacity': 0.8,
-        #     }
-        # )
-        #
-        # # Configure the layout.
-        # layout = go.Layout(
-        #     margin={'l': 0, 'r': 0, 'b': 0, 't': 0}
-        # )
-        #
-        # data = [trace]
-        #
-        # fig = go.Figure(data=data, layout=layout)
-
-    # def next_scatter(num, coords):
-    #     xv = coords[num, :, :, 0]
-    #     yv = coords[num, :, :, 1]
-    #     zv = coords[num, :, :, 2]
-    #     vmax = np.percentile(zv, 95)
-    #     normalizer = mpl.colors.Normalize(vmin=zv.min(), vmax=vmax)
-    #     mapper = cm.ScalarMappable(norm=normalizer, cmap='magma')
-    #     colormapped_im = mapper.to_rgba(zv)[:, :, :3]
-    #     ax.clear()
-    #     scattered = ax.scatter(xv.flatten(), yv.flatten(), zv.flatten(), s=200, c=colormapped_im.reshape((-1, 3)))
-    #     # scattered = ax.plot_surface(xv, yv, zv, cmap='coolwarm', linewidth=1, antialiased=True)
-    #     MAX = 5
-    #     # for direction in (-1, 1):
-    #     #     for point in np.diag(direction * MAX * np.array([1, 1, 1])):
-    #     #         ax.plot([point[0]], [point[1]], [point[2]], 'w')
-    #
-    #     # scattered = ax.scatter(xv.flatten(), yv.flatten(), zv.flatten(), s=2)
-    #     # for line, data in zip(lines, dataLines):
-    #     #     # NOTE: there is no .set_data() for 3 dim data...
-    #     #     line.set_data(data[0:2, :num])
-    #     #     line.set_3d_properties(data[2, :num])
-    #     # scatter_plots[num-1].set_visible(False)
-    #     # scatter_plots[num].set_visible(True)
-    #
-    # line_ani = animation.FuncAnimation(fig, next_scatter, len(coords), fargs=(coords, ), interval=100, blit=False)
-
-    plt.show()
-
-    # fig.show()
-
-    pass
+    return coords_3d
