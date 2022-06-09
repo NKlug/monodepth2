@@ -4,7 +4,7 @@ from torch.utils.data import DataLoader
 
 import datasets
 import networks
-from kitti_utils import get_absolute_camera_orientation
+from kitti_utils import read_calib_file
 from trainer import Trainer
 from utils import readlines
 import torch
@@ -50,17 +50,37 @@ def back_project_depths(data, opt):
     return data
 
 
+def get_image_to_imu_matrix(calib_dir, cam=2):
+    """Compute image to imu homogenous transformation matrix."""
+    # load calibration files
+    imu2velo = read_calib_file(os.path.join(calib_dir, 'calib_imu_to_velo.txt'))
+    cam2cam = read_calib_file(os.path.join(calib_dir, 'calib_cam_to_cam.txt'))
+    velo2cam = read_calib_file(os.path.join(calib_dir, 'calib_velo_to_cam.txt'))
+
+    # velo2cam (velo2rect) matrix
+    velo2cam = np.hstack((velo2cam['R'].reshape(3, 3), velo2cam['T'][..., np.newaxis]))
+    velo2cam = np.vstack((velo2cam, np.array([0, 0, 0, 1.0])))
+
+    # imu2velo matrix
+    imu2velo = np.hstack((imu2velo['R'].reshape(3, 3), imu2velo['T'][..., np.newaxis]))
+    imu2velo = np.vstack((imu2velo, np.array([0, 0, 0, 1.0])))
+
+    # cam2rect matrix
+    R_cam2rect = np.eye(4)
+    R_cam2rect[:3, :3] = cam2cam['R_rect_00'].reshape(3, 3)
+
+    # rect2camX matrix
+    P_rect = np.eye(4)
+    P_rect[:3, :4] = cam2cam['P_rect_0' + str(cam)].reshape(3, 4)
+
+    P_velo2im = np.dot(np.dot(P_rect, R_cam2rect), velo2cam)
+    P_imu2im = np.dot(P_velo2im, imu2velo)
+
+    # invert to get im2imu
+    return np.linalg.inv(P_imu2im)
 
 
-def get_camera_rotation_matrix(oxts):
-    """
-    Computes camera rotation matrices for leveling predicted 3d coordinates.
-    """
-    for i in range(len(oxts['lat'])):
-        pass
-
-
-def compute_3d_coordinates(predicted_depth, f=5, interim_downscale=4):
+def compute_3d_coordinates(predicted_depth, in_imu_coordinates=False, f=5, interim_downscale=4):
     h, w = predicted_depth.shape[:2]
     predicted_depth = cv2.resize(predicted_depth, (w // interim_downscale, h // interim_downscale))
     h, w = predicted_depth.shape[:2]
@@ -92,6 +112,19 @@ def compute_3d_coordinates(predicted_depth, f=5, interim_downscale=4):
     #     coordinates_3d[i] = np.dot(P, np.concatenate([coordinates_3d[i], np.ones((1,))]).T).T
 
     coordinates_3d = coordinates_3d.reshape((h, w, 3))
+
+    if in_imu_coordinates:
+        coordinates_3d = np.concatenate([coordinates_3d, np.ones((h, w, 1))], axis=-1)
+        coordinates_3d = coordinates_3d.reshape((-1, 4))
+
+        calib_dir = '/home/nikolas/Datasets/kitti_data/'
+        M = get_image_to_imu_matrix(calib_dir)
+
+        # transform to imu coords
+        coordinates_3d = np.dot(M, coordinates_3d.T).T
+
+        coordinates_3d = coordinates_3d[:, :3].reshape((h, w, 3))
+
     return coordinates_3d
 
 
