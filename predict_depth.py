@@ -58,6 +58,7 @@ def predict_depth(opt):
     pred_depths = []
     inv_Ks = []
     oxts_list = []
+    color_images = []
 
     print("-> Computing predictions with size {}x{}".format(
         encoder_dict['width'], encoder_dict['height']))
@@ -85,10 +86,12 @@ def predict_depth(opt):
             pred_depths.append(pred_depth)
             inv_Ks.append(inv_K)
             oxts_list.append(oxts)
+            color_images.append(input_color.cpu().numpy())
 
     pred_disps = np.concatenate(pred_disps)
     pred_depths = np.concatenate(pred_depths)
     inv_Ks = np.concatenate(inv_Ks)
+    color_images = np.concatenate(color_images)
 
     oxts_list = {key: np.concatenate([value[key] for value in oxts_list]) for key in oxts_list[0]}
 
@@ -96,7 +99,8 @@ def predict_depth(opt):
         "depth": pred_depths,
         "disp": pred_disps,
         "inv_K": inv_Ks,
-        "oxts": oxts_list
+        "oxts": oxts_list,
+        "color": color_images
     }
 
     if opt.save_pred_disps:
