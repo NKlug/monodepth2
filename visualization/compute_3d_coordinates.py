@@ -1,10 +1,11 @@
 import cv2
-
-from utils import lat_lon_to_meters
-import scipy.spatial as spat
 import numpy as np
+import scipy.spatial as spat
+import torch
 
-from visualization.visualize_sequence import experimental_compute_3d_coordinates, get_image_to_imu_matrix
+from kitti_utils import get_image_to_imu_matrix
+from layers import BackprojectDepth, disp_to_depth
+from utils import lat_lon_to_meters
 
 
 def get_global_coords(data):
@@ -24,21 +25,27 @@ def get_global_coords(data):
     return lat, lon, alt, roll, pitch, yaw
 
 
-def compute_3d_coordinates(data, downscale=1, global_coordinates=False):
+def compute_3d_coordinates(data, downscale=1, global_coordinates=False, max_depth=None):
     """
     Compute 3d coordinates from predicted depth and camera intrinsics in meters.
     """
-    predicted_depths = data["disp"]
+    back_project_fn = back_project_perspective
+
+    predicted_depths = data["depth"]
     lat, lon, alt, roll, pitch, yaw = get_global_coords(data)
 
     coords = []
     for i, predicted_depth in enumerate(predicted_depths):
-        # inv_K = data['inv_K'][i]
-        # coords_3d = experimental_compute_3d_coordinates(predicted_depth, inv_K, in_imu_coordinates=True,
-        #                                    interim_downscale=downscale)
-        coords_3d = back_project(predicted_depth, in_imu_coordinates=global_coordinates, interim_downscale=downscale)
+
+        if max_depth is not None:
+            predicted_depth = np.minimum(predicted_depth, max_depth)
+
+        inv_K = data['inv_K'][i]
+        coords_3d = back_project_fn(predicted_depth, downscale=downscale, inv_K=inv_K)
 
         if global_coordinates:
+            coords_3d = image_to_imu_coordinates(coords_3d)
+
             # compute coordinates in global coordinate system
             position = np.asarray([lat[i], lon[i], alt[i]])
             orientation = np.asarray([roll[i], pitch[i], yaw[i] - np.pi / 2])
@@ -63,12 +70,12 @@ def compute_3d_coordinates(data, downscale=1, global_coordinates=False):
     return np.asarray(coords)
 
 
-def back_project(predicted_depth, in_imu_coordinates=False, f=5, interim_downscale=4):
+def back_project_orthographic(predicted_depth, f=5, downscale=4, *args, **kwargs):
     """
     Back project predicted depths to 3D space.
     """
     h, w = predicted_depth.shape[:2]
-    predicted_depth = cv2.resize(predicted_depth, (w // interim_downscale, h // interim_downscale))
+    predicted_depth = cv2.resize(predicted_depth, (w // downscale, h // downscale), interpolation=cv2.INTER_LINEAR)
     h, w = predicted_depth.shape[:2]
 
     aspect_ratio = h / w
@@ -89,10 +96,31 @@ def back_project(predicted_depth, in_imu_coordinates=False, f=5, interim_downsca
     coordinates_3d = np.stack([xv.flatten(), yv.flatten(), zv.flatten()], axis=-1)
     coordinates_3d = coordinates_3d.reshape((h, w, 3))
 
-    if in_imu_coordinates:
-        coordinates_3d = image_to_imu_coordinates(coordinates_3d)
-
     return coordinates_3d
+
+
+def back_project_perspective(predicted_depth, inv_K, downscale=4, *args, **kwargs):
+    """
+    Compute 3d coordinates by perspective re-projection using the 2d coordinates and estimated depths.
+    """
+    # back-project as during training
+    h, w = predicted_depth.shape
+    back_project = BackprojectDepth(1, h, w).cpu()
+
+    predicted_depth = predicted_depth[np.newaxis, ...]
+    inv_K = inv_K[np.newaxis, ...]
+
+    with torch.no_grad():
+        depths_batch = torch.from_numpy(predicted_depth).cpu()
+        inv_K_batch = torch.from_numpy(inv_K).cpu()
+        cam_points = back_project(depths_batch, inv_K_batch).cpu().numpy()
+        cam_points = cam_points.reshape((-1, 4, h, w))
+        cam_points = cam_points[:, :3, ...]
+
+    cam_points = cam_points[0].T
+    cam_points = cv2.resize(cam_points, (h // downscale, w // downscale), interpolation=cv2.INTER_LINEAR)
+
+    return cam_points
 
 
 def image_to_imu_coordinates(coords_3d, calib_dir='/home/nikolas/Datasets/kitti_data/'):

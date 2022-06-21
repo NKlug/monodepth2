@@ -15,7 +15,7 @@ class Visualizer:
         self.data = data
         self.fig = plt.figure(figsize=(20, 10))
         self.fig.tight_layout()
-        self.ax = self.fig.add_subplot(111, projection='3d', proj_type='persp')
+        self.ax = self.fig.add_subplot(111, projection='3d')
 
     def plot_camera_path(self):
 
@@ -59,7 +59,7 @@ class Visualizer:
         downscale = 8
 
         # compute and extract some data
-        predicted_depths = self.data['disp']
+        predicted_depths = self.data['depth']
         coords = compute_3d_coordinates(self.data, downscale=downscale, global_coordinates=True)
         lat, lon, alt, roll, pitch, yaw = get_global_coords(self.data)
 
@@ -115,7 +115,7 @@ class Visualizer:
         Create simple animation of back projected 3D points without accounting for relative position change.
         """
         downscale = 8
-        predicted_depths = self.data['disp']
+        predicted_depths = self.data['depth']
         coords = compute_3d_coordinates(self.data, downscale=downscale)
 
         def next_scatter(num, coords):
@@ -134,6 +134,13 @@ class Visualizer:
             self.ax.set_xlabel('X')
             self.ax.set_ylabel('Y')
             self.ax.set_zlabel('Z')
+
+            # add bouding points for equal axes scales
+            MAX = 1
+            for direction in (-1, 1):
+                for point in np.diag(direction * MAX * np.array([1, 1, 1])):
+                    self.ax.plot([point[0]], [point[1]], [point[2]], 'green')
+
             scattered = self.ax.scatter(xv.ravel(), yv.ravel(), zv.ravel(), s=200, c=colors.reshape((-1, 3)))
 
         # create animation
@@ -157,7 +164,7 @@ class Visualizer:
         Create simple animation of back projected 3D points without accounting for relative position change.
         """
         downscale = 8
-        predicted_depths = self.data['disp']
+        predicted_depths = self.data['depth']
         coords = compute_3d_coordinates(self.data, downscale=downscale)
 
         xv = coords[step_num, :, :, 0]
@@ -169,9 +176,10 @@ class Visualizer:
         h, w = color_depths.shape[:2]
         color_depths = cv2.resize(color_depths, (w // downscale, h // downscale))
         colors = self.compute_coloring(color_depths)
+        colors = np.swapaxes(colors, 0, 1)
 
         # add bouding points for equal axes scales
-        MAX = 2
+        MAX = 1
         for direction in (-1, 1):
             for point in np.diag(direction * MAX * np.array([1, 1, 1])):
                 self.ax.plot([point[0]], [point[1]], [point[2]], 'green')
@@ -183,3 +191,4 @@ class Visualizer:
         scattered = self.ax.scatter(xv.ravel(), yv.ravel(), zv.ravel(), s=200, c=colors.reshape((-1, 3)))
 
         plt.show()
+        cv2.waitKey()
