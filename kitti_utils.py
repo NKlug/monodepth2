@@ -126,6 +126,42 @@ def get_absolute_camera_orientation(calib_dir, oxts_data, cam=2):
     return P_imu2im
 
 
+def get_image_to_imu_matrix(calib_dir, cam=2):
+    """Compute image to IMU homogenous transformation matrix.
+     The result might not exactly match the global coordinates, as Godart et al. use their own camera intrinsics.
+     However, the resulting absolute rotation should be correct.
+    """
+    # load calibration files
+    imu2velo = read_calib_file(os.path.join(calib_dir, 'calib_imu_to_velo.txt'))
+    cam2cam = read_calib_file(os.path.join(calib_dir, 'calib_cam_to_cam.txt'))
+    velo2cam = read_calib_file(os.path.join(calib_dir, 'calib_velo_to_cam.txt'))
+
+    # velo2cam (velo2rect) matrix
+    velo2cam = np.hstack((velo2cam['R'].reshape(3, 3), velo2cam['T'][..., np.newaxis]))
+    velo2cam = np.vstack((velo2cam, np.array([0, 0, 0, 1.0])))
+
+    # imu2velo matrix
+    imu2velo = np.hstack((imu2velo['R'].reshape(3, 3), imu2velo['T'][..., np.newaxis]))
+    imu2velo = np.vstack((imu2velo, np.array([0, 0, 0, 1.0])))
+
+    # cam2rect matrix
+    R_cam2rect = np.eye(4)
+    R_cam2rect[:3, :3] = cam2cam['R_rect_00'].reshape(3, 3)
+
+    # rect2camX matrix is omitted, as the authors use their own camera intrinsics
+    # P_rect = np.eye(4)
+    # P_rect[:3, :4] = cam2cam['P_rect_0' + str(cam)].reshape(3, 4)
+    #
+    # P_velo2im = np.dot(np.dot(P_rect, R_cam2rect), velo2cam)
+
+    P_velo2im = np.dot(R_cam2rect, velo2cam)
+
+    P_imu2im = np.dot(P_velo2im, imu2velo)
+
+    # invert to get im2imu
+    return np.linalg.inv(P_imu2im)
+
+
 def load_oxts(calib_dir, oxts_filename, cam=2):
     """Generate absolute camera coordinates from oxts data
     """
