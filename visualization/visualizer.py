@@ -94,10 +94,11 @@ class Visualizer:
             zv = coords[on_press.num, :, :, 2]
 
             # compute colors
-            color_depths = predicted_depths[on_press.num]
+            color_depths = predicted_depths[i]
             h, w = color_depths.shape[:2]
             color_depths = cv2.resize(color_depths, (w // downscale, h // downscale))
             colors = self.compute_coloring(color_depths)
+            colors = np.swapaxes(colors, 0, 1)
 
             self.ax.set_xlabel('X')
             self.ax.set_ylabel('Y')
@@ -116,7 +117,7 @@ class Visualizer:
         """
         downscale = 8
         predicted_depths = self.data['depth']
-        coords = compute_3d_coordinates(self.data, downscale=downscale)
+        coords = compute_3d_coordinates(self.data, downscale=downscale, max_depth=3, global_coordinates=True)
 
         def next_scatter(num, coords):
             xv = coords[num, :, :, 0]
@@ -128,6 +129,7 @@ class Visualizer:
             h, w = color_depths.shape[:2]
             color_depths = cv2.resize(color_depths, (w // downscale, h // downscale))
             colors = self.compute_coloring(color_depths)
+            colors = np.swapaxes(colors, 0, 1)
 
             # plot data
             self.ax.clear()
@@ -136,11 +138,12 @@ class Visualizer:
             self.ax.set_zlabel('Z')
 
             # add bouding points for equal axes scales
-            MAX = 1
+            MAX = 2
             for direction in (-1, 1):
                 for point in np.diag(direction * MAX * np.array([1, 1, 1])):
                     self.ax.plot([point[0]], [point[1]], [point[2]], 'green')
 
+            self.plot_camera_path()
             scattered = self.ax.scatter(xv.ravel(), yv.ravel(), zv.ravel(), s=200, c=colors.reshape((-1, 3)))
 
         # create animation
@@ -165,7 +168,8 @@ class Visualizer:
         """
         downscale = 8
         predicted_depths = self.data['depth']
-        coords = compute_3d_coordinates(self.data, downscale=downscale)
+        # coords = compute_3d_coordinates(self.data, downscale=downscale, global_coordinates=False)
+        coords = compute_3d_coordinates(self.data, downscale=downscale, global_coordinates=True)
 
         xv = coords[step_num, :, :, 0]
         yv = coords[step_num, :, :, 1]

@@ -48,13 +48,14 @@ def compute_3d_coordinates(data, downscale=1, global_coordinates=False, max_dept
 
             # compute coordinates in global coordinate system
             position = np.asarray([lat[i], lon[i], alt[i]])
-            orientation = np.asarray([roll[i], pitch[i], yaw[i] - np.pi / 2])
+            orientation = np.asarray([roll[i], pitch[i], yaw[i]])
             rot = spat.transform.Rotation.from_euler('xyz', orientation).as_matrix()
 
             global2imu = np.eye(4)
             global2imu[:3, :3] = rot
-            global2imu[3, :3] = position
+            global2imu[:3, 3] = position
             imu2global = np.linalg.inv(global2imu)
+            imu2global = global2imu
 
             h, w = coords_3d.shape[:2]
             coords_3d = np.concatenate([coords_3d, np.ones((h, w, 1))], axis=-1)
