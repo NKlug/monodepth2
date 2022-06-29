@@ -11,6 +11,13 @@ import matplotlib.cm as cm
 from visualization.compute_3d_coordinates import compute_3d_coordinates
 
 SIZE = 800
+FORWARD = 'forward'
+BACKWARD = 'backward'
+LEFT = 'left'
+RIGHT = 'right'
+
+ON = 1
+OFF = 0
 
 
 def turn_pose(pose):
@@ -38,6 +45,11 @@ class Visualizer(ShowBase):
 
         self.data = data
 
+        self.camera_position = np.asarray([6, 6, 4])
+        self.look_at = np.asarray([0, 0, 0])
+        self.control_map = {'forward': 0, 'backward': 0, 'right': 0, 'left': 0}
+        self.move_speed = 0.7
+
         self.fps = 30
         self.rotation_speed = 10
         self.current_pose_index = 0
@@ -56,23 +68,64 @@ class Visualizer(ShowBase):
         wp.setTitle('3D depths')
         wp.setSize(SIZE, SIZE)
         wp.setOrigin(50, 50)
+        wp.setCursorHidden(True)
+        wp.setMouseMode(WindowProperties.MRelative)
 
         self.winList[0].requestProperties(wp)
-        self.camList[0].setPos(6, 6, 4)
-        self.camList[0].lookAt(0, 0, 0)
+        self.camList[0].setPos(*self.camera_position)
+        self.camList[0].lookAt(*self.look_at)
         mk = self.dataRoot.attachNewNode(MouseAndKeyboard(self.winList[0], 0, 'w2mouse'))
         mk.attachNewNode(ButtonThrower('w2mouse'))
 
     def configure_tasks(self):
-        self.taskMgr.add(self.auto_rotate, 'autoRotate')
+        # self.taskMgr.add(self.auto_rotate, 'autoRotate')
         self.accept('q', self.finalizeExit)
-        # self.configure_camera_controls()
+        self.configure_camera_controls()
 
     def configure_camera_controls(self):
-        self.accept('w', self.move_forward)
-        self.accept('s', self.move_backward)
-        self.accept('a', self.move_left)
-        self.accept('d', self.move_up)
+        self.accept('w', self.set_control, [FORWARD, ON])
+        self.accept('w-up', self.set_control, [FORWARD, OFF])
+        self.accept('s', self.set_control, [BACKWARD, ON])
+        self.accept('s-up', self.set_control, [BACKWARD, OFF])
+        self.accept('d', self.set_control, [RIGHT, ON])
+        self.accept('d-up', self.set_control, [RIGHT, OFF])
+        self.accept('a', self.set_control, [LEFT, ON])
+        self.accept('a-up', self.set_control, [LEFT, OFF])
+
+        self.taskMgr.add(self.move, 'moveTask')
+
+    def set_control(self, direction, mode):
+        self.control_map[direction] = mode
+
+    def move(self, task):
+        # get look-at direction in x-y plane
+        planar_look_at_direction = self.look_at - self.camera_position
+        planar_look_at_direction[2] = 0
+        planar_look_at_direction = planar_look_at_direction / np.linalg.norm(planar_look_at_direction)
+
+        # get vector perpendicular to look-at direction, pointing towards the right
+        right_direction = planar_look_at_direction[[1, 0, 2]]
+        right_direction[1] *= -1
+
+        if self.control_map[FORWARD] == ON:
+            direction = planar_look_at_direction
+        elif self.control_map[BACKWARD] == ON:
+            direction = -planar_look_at_direction
+        elif self.control_map[RIGHT] == ON:
+            direction = right_direction
+        elif self.control_map[LEFT] == ON:
+            direction = -right_direction
+        else:
+            return Task.cont
+
+
+        self.camera_position = self.camera_position + self.move_speed * direction
+        self.look_at = self.look_at + self.move_speed * direction
+        self.camList[0].setPos(*self.camera_position)
+        self.camList[0].lookAt(*self.look_at)
+
+        return Task.cont
+
 
     def next_step(self):
         self.current_pose_index += 1
