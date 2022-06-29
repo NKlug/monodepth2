@@ -3,7 +3,8 @@ import pickle
 import numpy as np
 
 from options import MonodepthOptions
-from visualization.visualizer import Visualizer
+from visualization.visualizer import Visualizer as MatplotVisualizer
+from visualization.panda_visualizer import Visualizer as PandaVisualizer
 
 if __name__ == '__main__':
     if __name__ == '__main__':
@@ -16,7 +17,11 @@ if __name__ == '__main__':
         with open(output_path, 'rb') as f:
             data = pickle.load(f)
 
-        visualizer = Visualizer(data)
+        # visualizer = MatplotVisualizer(data)
         # visualizer.visualize_single_step(0)
-        visualizer.simple_visualize_sequence()
+        # visualizer.simple_visualize_sequence()
         # visualizer.visualize_with_steps()
+
+        app = PandaVisualizer(data)
+        app.visualize_single_step(0)
+        app.run()

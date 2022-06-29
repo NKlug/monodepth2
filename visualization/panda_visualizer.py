@@ -1,11 +1,16 @@
 from direct.showbase.ShowBase import ShowBase
 from direct.showbase.ShowBaseGlobal import globalClock
 from direct.task import Task
+from direct.showbase.Loader import Loader
 from panda3d.core import *
 import numpy as np
+import cv2
+import matplotlib as mpl
+import matplotlib.cm as cm
 
+from visualization.compute_3d_coordinates import compute_3d_coordinates
 
-SIZE = 600
+SIZE = 800
 
 
 def turn_pose(pose):
@@ -26,65 +31,54 @@ def turn_pose(pose):
     return pose
 
 
-class PoseRenderer(ShowBase):
+class Visualizer(ShowBase):
 
-    def __init__(self, poses, skeleton=get_skeleton_15(), colored_skeleton=get_colored_skeleton_15(), colored=True,
-                 max_display=8, image_paths=None):
+    def __init__(self, data):
         ShowBase.__init__(self)
-        poses = np.asarray(poses)
-        if len(poses.shape) == 2:
-            poses = [poses]
-        if len(poses.shape) == 3:
-            poses = [poses]
-        poses = poses[:max_display]
-        self.poses = poses
 
-        self.skeleton = skeleton
-        self.colored_skeleton = colored_skeleton
-        self.colored = colored
-        self.image_paths = image_paths
+        self.data = data
+
         self.fps = 30
         self.rotation_speed = 10
         self.current_pose_index = 0
         self.vertex_data = None
         self.configure()
 
-        self.render_poses()
-
     def configure(self):
         self.disableMouse()
         globalClock.setMode(ClockObject.MLimited)
         globalClock.setFrameRate(self.fps)
-        self.create_windows()
+        self.create_window()
         self.configure_tasks()
 
-    def create_windows(self):
-        for i in range(len(self.poses)):
-            wp = WindowProperties()
-            wp.setTitle('Pose {}'.format(i))
-            wp.setSize(SIZE, SIZE)
-            wp.setOrigin(50 + i * (SIZE + 20), 200 + i // 4 * (SIZE + 20))
-            if i != 0:
-                self.openWindow(props=wp)
-            else:
-                self.winList[i].requestProperties(wp)
-            self.camList[i].setPos(6, 6, 4)
-            self.camList[i].lookAt(0, 0, 0)
-            mk = self.dataRoot.attachNewNode(MouseAndKeyboard(self.winList[i], 0, 'w2mouse'))
-            mk.attachNewNode(ButtonThrower('w2mouse'))
+    def create_window(self):
+        wp = WindowProperties()
+        wp.setTitle('3D depths')
+        wp.setSize(SIZE, SIZE)
+        wp.setOrigin(50, 50)
+
+        self.winList[0].requestProperties(wp)
+        self.camList[0].setPos(6, 6, 4)
+        self.camList[0].lookAt(0, 0, 0)
+        mk = self.dataRoot.attachNewNode(MouseAndKeyboard(self.winList[0], 0, 'w2mouse'))
+        mk.attachNewNode(ButtonThrower('w2mouse'))
 
     def configure_tasks(self):
         self.taskMgr.add(self.auto_rotate, 'autoRotate')
-        self.accept('+', self.next_pose)
-        self.accept('+-repeat', self.next_pose)
-        self.accept('-', self.previous_pose)
-        self.accept('--repeat', self.previous_pose)
+        self.accept('q', self.finalizeExit)
+        # self.configure_camera_controls()
 
-    def next_pose(self):
+    def configure_camera_controls(self):
+        self.accept('w', self.move_forward)
+        self.accept('s', self.move_backward)
+        self.accept('a', self.move_left)
+        self.accept('d', self.move_up)
+
+    def next_step(self):
         self.current_pose_index += 1
         self.render_poses()
 
-    def previous_pose(self):
+    def previous_step(self):
         self.current_pose_index -= 1
         self.render_poses()
 
@@ -105,50 +99,64 @@ class PoseRenderer(ShowBase):
             cam.lookAt(0, 0, 0)
         return Task.cont
 
-    def render_poses(self):
-        for i, poses in enumerate(self.poses):
-            current_pose = poses[self.current_pose_index % len(poses)]
-            root = NodePath('Pose {}'.format(i))
-            if self.colored:
-                pose_node = self.render_colored_pose(current_pose)
-            else:
-                pose_node = self.render_pose(current_pose)
+    def compute_coloring(self, depths, downscale=1):
+        h, w = depths.shape[:2]
+        depths = cv2.resize(depths, (w // downscale, h // downscale))
 
-            axes_node = self.create_axes(2)
-            axes_node.reparentTo(root)
-            pose_node.reparentTo(root)
-            self.camList[i].reparentTo(root)
+        vmax = np.percentile(depths, 95)
+        normalizer = mpl.colors.Normalize(vmin=depths.min(), vmax=vmax)
+        mapper = cm.ScalarMappable(norm=normalizer, cmap='magma')
+        colors = mapper.to_rgba(depths)[:, :, :3]
+        return np.swapaxes(colors, 0, 1)
 
-            if self.image_paths:
-                print('Showing {}'.format(path.basename(self.image_paths[self.current_pose_index % len(poses)])))
+    def visualize_single_step(self, step_num=0):
+        """
+        Create simple animation of back projected 3D points without accounting for relative position change.
+        """
+        self.accept('+', self.next_step)
+        self.accept('+-repeat', self.next_step)
+        self.accept('-', self.previous_step)
+        self.accept('--repeat', self.previous_step)
 
-    def render_colored_pose(self, pose):
-        skeleton = self.colored_skeleton
-        ls = LineSegs()
-        ls.setThickness(2)
+        downscale = 8
+        predicted_depths = self.data['depth']
+        coords = compute_3d_coordinates(self.data, downscale=downscale, global_coordinates=True)
+        # swap z and y axis
+        # coords = coords[..., [0, 2, 1]]
+        # coords[..., 2] *= -1
 
-        for i in range(skeleton.shape[0]):
-            for j in range(skeleton.shape[1]):
-                if np.any(skeleton[i][j]):
-                    ls.setColor(*skeleton[i][j])
-                    ls.move_to(*pose[i])
-                    ls.draw_to(*pose[j])
+        coords_3d = coords[step_num]
 
-        node = ls.create()
-        return NodePath(node)
+        # compute colors
+        color_depths = predicted_depths[step_num]
+        colors = self.compute_coloring(color_depths, downscale)
 
-    def render_pose(self, pose):
-        ls = LineSegs()
-        ls.setThickness(2)
+        root = NodePath('Depth 0')
 
-        for i in range(self.skeleton.shape[0]):
-            for j in range(self.skeleton.shape[1]):
-                if self.skeleton[i][j]:
-                    ls.move_to(*pose[i])
-                    ls.draw_to(*pose[j])
+        pose_node = self._render_single_depth_map(coords_3d, colors)
 
-        node = ls.create()
-        return NodePath(node)
+        axes_node = self.create_axes(2)
+        axes_node.reparentTo(root)
+        pose_node.reparentTo(root)
+        self.camList[0].reparentTo(root)
+        self.setBackgroundColor(200, 200, 200)
+
+    def _render_single_depth_map(self, coords_3d, colors, center_of_projection=None):
+        """
+        Renders the given 3d coordinates as a point cloud.
+        """
+        node = NodePath('depth base node')
+
+        h, w = coords_3d.shape[:2]
+        for i in range(h):
+            for j in range(w):
+                smiley = self.loader.loadModel('smiley')
+                smiley.reparentTo(node)
+                smiley.setScale(0.01)
+                smiley.setPos(*coords_3d[i, j])
+                smiley.setColor(*colors[i, j])
+
+        return node
 
     def create_axes(self, length=1):
         ls = LineSegs()
@@ -171,41 +179,3 @@ class PoseRenderer(ShowBase):
 
         node = ls.create()
         return NodePath(node)
-
-
-if __name__ == '__main__':
-    from os import path
-    import pickle as pkl
-    import data_processing.human36m.process_custom as proc
-    import projections
-    import data_processing.human36m.preprocessing as pre
-
-    data_dir = '/home/nikolas/Projects/2dto3dpose/data/'
-    file_path = path.join('/home/nikolas/Projects/2dto3dpose/data/', 'processed', 'by_camera.pkl')
-    if not path.isfile(file_path):
-        p2, raw_poses, p3_univ, p3_orig = proc.get_all_poses_by_camera(data_dir, 'test')
-        poses = []
-        for cam in raw_poses:
-            poses.append(read_data.convert_to_n_joints(np.asarray(raw_poses[cam], dtype=np.float32), 15))
-
-        poses = np.asarray(poses)
-        with open(file_path, 'wb') as file:
-            pkl.dump(poses, file)
-    else:
-        with open(file_path, 'rb') as file:
-            poses = pkl.load(file)
-
-    for i in range(len(poses)):
-        poses[i] = np.asarray(pre.rectify_all(poses[i]))
-        poses[i] = poses[i][:1111] - poses[i][0, 0]
-        poses[i] = projections.normalize_3d_pose(poses[i], scale_joints=[0, 7])
-
-    # poses = read_data.get_original_3d_poses(data_dir, joints=15, phase='test')
-    # poses = np.array(poses, dtype=np.float32)
-    # poses = projections.normalize_3d_pose(poses, scale_joints=[0, 7])
-    # poses -= poses[0][0]
-    poses = turn_pose(poses)
-
-    app = PoseRenderer(poses, skeleton=get_skeleton_15(),
-                       colored_skeleton=get_colored_skeleton_15())
-    app.run()
