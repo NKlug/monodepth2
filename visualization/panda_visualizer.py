@@ -7,6 +7,7 @@ import numpy as np
 import cv2
 import matplotlib as mpl
 import matplotlib.cm as cm
+import scipy.spatial as spat
 
 from visualization.compute_3d_coordinates import compute_3d_coordinates
 
@@ -46,14 +47,18 @@ class Visualizer(ShowBase):
         self.data = data
 
         self.camera_position = np.asarray([6, 6, 4])
-        self.look_at = np.asarray([0, 0, 0])
+        self.yaw = 135
+        self.pitch = -25
         self.control_map = {'forward': 0, 'backward': 0, 'right': 0, 'left': 0}
+
         self.move_speed = 0.7
+        self.cam_speed = 1
 
         self.fps = 30
         self.rotation_speed = 10
         self.current_pose_index = 0
         self.vertex_data = None
+
         self.configure()
 
     def configure(self):
@@ -72,8 +77,8 @@ class Visualizer(ShowBase):
         wp.setMouseMode(WindowProperties.MRelative)
 
         self.winList[0].requestProperties(wp)
-        self.camList[0].setPos(*self.camera_position)
-        self.camList[0].lookAt(*self.look_at)
+        self.camera.setPos(*self.camera_position)
+        self.camera.setHpr(self.yaw, self.pitch, 0)
         mk = self.dataRoot.attachNewNode(MouseAndKeyboard(self.winList[0], 0, 'w2mouse'))
         mk.attachNewNode(ButtonThrower('w2mouse'))
 
@@ -93,24 +98,26 @@ class Visualizer(ShowBase):
         self.accept('a-up', self.set_control, [LEFT, OFF])
 
         self.taskMgr.add(self.move, 'moveTask')
+        self.taskMgr.add(self.move_camera, 'moveCameraTask')
 
     def set_control(self, direction, mode):
         self.control_map[direction] = mode
 
     def move(self, task):
-        # get look-at direction in x-y plane
-        planar_look_at_direction = self.look_at - self.camera_position
-        planar_look_at_direction[2] = 0
-        planar_look_at_direction = planar_look_at_direction / np.linalg.norm(planar_look_at_direction)
-
+        # get look at direction in x-y-plane
+        # https://stackoverflow.com/questions/1568568/how-to-convert-euler-angles-to-directional-vector
+        yaw = self.yaw / 180 * np.pi
+        look_at_direction = np.asarray([-np.sin(yaw), np.cos(yaw), 0])
+        look_at_direction = look_at_direction / np.linalg.norm(look_at_direction)
+        print(look_at_direction)
         # get vector perpendicular to look-at direction, pointing towards the right
-        right_direction = planar_look_at_direction[[1, 0, 2]]
+        right_direction = look_at_direction[[1, 0, 2]]
         right_direction[1] *= -1
 
         if self.control_map[FORWARD] == ON:
-            direction = planar_look_at_direction
+            direction = look_at_direction
         elif self.control_map[BACKWARD] == ON:
-            direction = -planar_look_at_direction
+            direction = -look_at_direction
         elif self.control_map[RIGHT] == ON:
             direction = right_direction
         elif self.control_map[LEFT] == ON:
@@ -118,14 +125,27 @@ class Visualizer(ShowBase):
         else:
             return Task.cont
 
-
         self.camera_position = self.camera_position + self.move_speed * direction
-        self.look_at = self.look_at + self.move_speed * direction
-        self.camList[0].setPos(*self.camera_position)
-        self.camList[0].lookAt(*self.look_at)
+        self.camera.setPos(*self.camera_position)
+        self.camera.setHpr(self.yaw, self.pitch, 0)
 
         return Task.cont
 
+    def move_camera(self, task):
+        if self.mouseWatcherNode.hasMouse():
+            # get changes in mouse position
+            md = self.win.getPointer(0)
+            deltaX = md.getX()
+            deltaY = md.getY()
+
+            self.win.movePointer(0, 0, 0)
+
+            yaw, pitch, roll = self.camera.getHpr()
+            self.yaw = ((yaw + 180 + self.cam_speed * 1e-2 * deltaX) % 360) - 180
+            self.pitch = ((pitch + 180 + self.cam_speed * 1e-2 * deltaY) % 360) - 180
+            self.camera.setHpr(self.yaw, self.pitch, roll)
+
+        return Task.cont
 
     def next_step(self):
         self.current_pose_index += 1
@@ -191,7 +211,7 @@ class Visualizer(ShowBase):
         axes_node = self.create_axes(2)
         axes_node.reparentTo(root)
         pose_node.reparentTo(root)
-        self.camList[0].reparentTo(root)
+        self.camera.reparentTo(root)
         self.setBackgroundColor(200, 200, 200)
 
     def _render_single_depth_map(self, coords_3d, colors, center_of_projection=None):
@@ -203,11 +223,11 @@ class Visualizer(ShowBase):
         h, w = coords_3d.shape[:2]
         for i in range(h):
             for j in range(w):
-                smiley = self.loader.loadModel('smiley')
-                smiley.reparentTo(node)
-                smiley.setScale(0.01)
-                smiley.setPos(*coords_3d[i, j])
-                smiley.setColor(*colors[i, j])
+                sphere = self.loader.loadModel('smiley')
+                sphere.reparentTo(node)
+                sphere.setScale(0.01)
+                sphere.setPos(*coords_3d[i, j])
+                sphere.setColor(*colors[i, j])
 
         return node
 
