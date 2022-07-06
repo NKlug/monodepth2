@@ -16,21 +16,7 @@ from utils import readlines
 from kitti_utils import generate_depth_map
 
 
-def export_gt_depths_kitti():
-
-    parser = argparse.ArgumentParser(description='export_gt_depth')
-
-    parser.add_argument('--data_path',
-                        type=str,
-                        help='path to the root of the KITTI data',
-                        required=True)
-    parser.add_argument('--split',
-                        type=str,
-                        help='which split to export gt from',
-                        required=True,
-                        choices=["eigen", "eigen_benchmark", "sequence"])
-    opt = parser.parse_args()
-
+def export_gt_depths_kitti(opt):
     split_folder = os.path.join(os.path.dirname(__file__), "splits", opt.split)
     lines = readlines(os.path.join(split_folder, "test_files.txt"))
 
@@ -62,4 +48,16 @@ def export_gt_depths_kitti():
 
 
 if __name__ == "__main__":
-    export_gt_depths_kitti()
+    parser = argparse.ArgumentParser(description='export_gt_depth')
+
+    parser.add_argument('--data_path',
+                        type=str,
+                        help='path to the root of the KITTI data',
+                        required=True)
+    parser.add_argument('--split',
+                        type=str,
+                        help='which split to export gt from',
+                        required=True,
+                        choices=["eigen", "eigen_benchmark", "sequence"])
+    opt = parser.parse_args()
+    export_gt_depths_kitti(opt)

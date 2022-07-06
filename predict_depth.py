@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader
 import datasets
 import networks
 from evaluate_depth import batch_post_process_disparity
+from export_gt_depth import export_gt_depths_kitti
 from layers import disp_to_depth
 from options import MonodepthOptions
 from utils import readlines
@@ -93,6 +94,18 @@ def predict_depth(opt):
     inv_Ks = np.concatenate(inv_Ks)
     color_images = np.concatenate(color_images)
 
+    # get ground truth depth medians for scaling
+    split_folder = os.path.join(os.path.dirname(__file__), "splits", opt.split)
+    gt_depth_file = os.path.join(split_folder, "gt_depths.npz")
+
+    if not os.path.exists(gt_depth_file):
+        print(f"-> No ground truth depths file found. Exporting ground truth depths to {gt_depth_file}!")
+        export_gt_depths_kitti(opt)
+
+    print(f"-> Computing per image ground truth depth medians")
+    gt_depths = np.load(gt_depth_file, fix_imports=True, encoding='latin1', allow_pickle=True)["data"]
+    gt_medians = np.asarray([np.median(gt_depth) for gt_depth in gt_depths])
+
     oxts_list = {key: np.concatenate([value[key] for value in oxts_list]) for key in oxts_list[0]}
 
     outputs = {
@@ -100,7 +113,8 @@ def predict_depth(opt):
         "disp": pred_disps,
         "inv_K": inv_Ks,
         "oxts": oxts_list,
-        "color": color_images
+        "color": color_images,
+        "gt_medians": gt_medians
     }
 
     if opt.save_pred_disps:
