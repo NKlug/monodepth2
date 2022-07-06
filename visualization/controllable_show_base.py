@@ -40,11 +40,16 @@ class ControllableShowBase(ShowBase):
         self.configure()
 
     def create_light(self):
+        ambientLight = AmbientLight("ambientLight")
+        # existing lighting is effectively darkened so boost ambient a bit
+        ambientLight.setColor(Vec4(.4, .4, .4, 1))
+
         directionalLight = DirectionalLight("directionalLight")
         directionalLight.setDirection(Vec3(-5, -5, -5))
 
         directionalLight.setColor(Vec4(2.0, 2.0, 2.0, 1.0))
         directionalLight.setSpecularColor(Vec4(2.0, 2.0, 2.0, 1))
+        self.root.setLight(self.root.attachNewNode(ambientLight))
         self.root.setLight(self.root.attachNewNode(directionalLight))
 
     def configure(self):
@@ -63,14 +68,15 @@ class ControllableShowBase(ShowBase):
         wp.setTitle('3D depths')
         wp.setSize(SIZE, SIZE)
         wp.setOrigin(50, 50)
+        self.disableMouse()
         wp.setCursorHidden(True)
         wp.setMouseMode(WindowProperties.MRelative)
 
         self.winList[0].requestProperties(wp)
         self.camera.setPos(*self.camera_position)
         self.camera.setHpr(self.yaw, self.pitch, 0)
-        mk = self.dataRoot.attachNewNode(MouseAndKeyboard(self.winList[0], 0, 'w2mouse'))
-        mk.attachNewNode(ButtonThrower('w2mouse'))
+        # mk = self.dataRoot.attachNewNode(MouseAndKeyboard(self.winList[0], 0, 'w2mouse'))
+        # mk.attachNewNode(ButtonThrower('w2mouse'))
 
     def configure_camera_controls(self):
         self.accept('w', self.set_control, [FORWARD, ON])
@@ -96,7 +102,7 @@ class ControllableShowBase(ShowBase):
         # first, move camera
         self.move_camera()
 
-        # get look at direction in x-y-plane
+        # get look-at direction in x-y-plane
         yaw = self.yaw / 180 * np.pi
         look_at_direction = np.asarray([-np.sin(yaw), np.cos(yaw), 0])
         look_at_direction = look_at_direction / np.linalg.norm(look_at_direction)
