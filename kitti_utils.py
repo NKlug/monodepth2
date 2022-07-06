@@ -151,8 +151,7 @@ def get_image_to_imu_matrix(calib_dir, cam=2):
     # rect2camX matrix is omitted, as the authors use their own camera intrinsics
     # P_rect = np.eye(4)
     # P_rect[:3, :4] = cam2cam['P_rect_0' + str(cam)].reshape(3, 4)
-    #
-    # P_velo2im = np.dot(np.dot(P_rect, R_cam2rect), velo2cam)
+    # R_cam2rect = np.dot(P_rect, R_cam2rect)
 
     P_velo2im = np.dot(R_cam2rect, velo2cam)
 

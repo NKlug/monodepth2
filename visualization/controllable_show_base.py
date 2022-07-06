@@ -22,18 +22,30 @@ class ControllableShowBase(ShowBase):
     def __init__(self):
         ShowBase.__init__(self)
 
-        self.camera_position = np.asarray([6, 6, 4])
+        self.camera_position = np.asarray([0, 0, 2])
         self.yaw = 135
-        self.pitch = -25
+        self.pitch = -10
         self.control_map = {FORWARD: 0, BACKWARD: 0, RIGHT: 0, LEFT: 0, UP: 0, DOWN: 0}
+
+        self.root = NodePath('Root Node')
+
+        self.global_grid_scale = None
 
         self.fps = 30
 
         self.rotation_speed = 10
-        self.move_speed = 0.4
+        self.move_speed = 0.2
         self.cam_speed = 2
 
         self.configure()
+
+    def create_light(self):
+        directionalLight = DirectionalLight("directionalLight")
+        directionalLight.setDirection(Vec3(-5, -5, -5))
+
+        directionalLight.setColor(Vec4(2.0, 2.0, 2.0, 1.0))
+        directionalLight.setSpecularColor(Vec4(2.0, 2.0, 2.0, 1))
+        self.root.setLight(self.root.attachNewNode(directionalLight))
 
     def configure(self):
         self.disableMouse()
@@ -44,6 +56,7 @@ class ControllableShowBase(ShowBase):
         self.accept('q', self.finalizeExit)
 
         self.configure_camera_controls()
+        self.create_light()
 
     def create_window(self):
         wp = WindowProperties()
@@ -125,7 +138,7 @@ class ControllableShowBase(ShowBase):
 
             yaw, pitch, roll = self.camera.getHpr()
             self.yaw = ((yaw + 180 + (-1) * self.cam_speed * 1e-2 * deltaX) % 360) - 180
-            self.pitch = ((pitch + 180 + self.cam_speed * 1e-2 * deltaY) % 360) - 180
+            self.pitch = ((pitch + 180 + (-1) * self.cam_speed * 1e-2 * deltaY) % 360) - 180
             self.camera.setHpr(self.yaw, self.pitch, roll)
 
     def auto_rotate(self, task):
@@ -146,6 +159,9 @@ class ControllableShowBase(ShowBase):
         return Task.cont
 
     def create_axes_and_grid(self, length=1):
+        grid_scale = self.global_grid_scale
+        if grid_scale is None:
+            grid_scale = 1.0
         ls = LineSegs()
         ls.setThickness(3)
 
