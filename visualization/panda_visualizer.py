@@ -96,7 +96,7 @@ class Visualizer(ControllableShowBase):
         # coords = coords[..., [0, 2, 1]]
         # coords[..., 2] *= -1
 
-    def _render_single_depth_map(self, use_relative_depths=False, alpha=1.0):
+    def _render_single_depth_map(self, use_relative_depths=True, alpha=1.0):
         """
         Renders the 3d coordinates at the current step as a point cloud.
         """
@@ -107,9 +107,16 @@ class Visualizer(ControllableShowBase):
 
         self.depth_node = NodePath('depth base node')
 
-        h, w = coords_3d.shape[:2]
-        for i in range(h):
-            for j in range(w):
+        w, h = coords_3d.shape[:2]
+
+        relative_depths = np.swapaxes(relative_depths, 0, 1)
+        relative_depths = cv2.resize(relative_depths, (h, w))
+        scale = -0.01 + 0.03 * relative_depths
+        scale = np.maximum(scale, 0.005)
+        scale = np.minimum(scale, 0.1)
+
+        for i in range(w):
+            for j in range(h):
                 sphere = self.loader.loadModel('smiley')
                 # texture = self.loader.loadTexture('maps/Dirlight.png')
 
@@ -118,8 +125,8 @@ class Visualizer(ControllableShowBase):
                 if not use_relative_depths:
                     sphere.setScale(self.base_sphere_scale)
                 else:
-                    scale = self.base_sphere_scale + 0.1 * (relative_depths[i, j] - np.min(relative_depths))
-                    sphere.setScale(scale)
+                    sphere.setScale(scale[i, j])
+                    # sphere.setScale(np.maximum(0.01, np.random.normal(0.03, 0.01)))
 
                 # sphere.setTexture(texture, 0)
                 sphere.setPos(*coords_3d[i, j])
