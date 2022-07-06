@@ -35,6 +35,16 @@ def compute_3d_coordinates(data, downscale=1, global_coordinates=False, max_dept
     lat, lon, alt, roll, pitch, yaw = get_global_coords(data)
 
     coords = []
+
+    # downscale lat and lon such that to ground truth and predicted median depths match
+    # see evaluate_depth.py lines 205 ff.
+    # gt_median = np.median(data["gt_depth"])
+    # predicted_median = np.median(predicted_depths)
+    # scale_factor = gt_median / predicted_median
+    scale_factor = 30.555
+    lat *= 1/scale_factor
+    lon *= 1/scale_factor
+
     for i, predicted_depth in enumerate(predicted_depths):
 
         if max_depth is not None:
