@@ -38,10 +38,11 @@ def compute_3d_coordinates(data, downscale=1, global_coordinates=False, max_dept
 
     # downscale lat and lon such that to ground truth and predicted median depths match
     # see evaluate_depth.py lines 205 ff.
-    # gt_median = np.median(data["gt_depth"])
-    # predicted_median = np.median(predicted_depths)
-    # scale_factor = gt_median / predicted_median
-    scale_factor = 30.555
+    gt_median = np.mean(data["gt_medians"])
+    pred_median = np.mean(data["pred_medians"])
+    scale_factor = gt_median / pred_median
+    print(f'-> Scaling predictions with factor {scale_factor}')
+    # scale_factor = 30.555
     lat *= 1/scale_factor
     lon *= 1/scale_factor
 

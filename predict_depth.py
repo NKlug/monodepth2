@@ -1,6 +1,7 @@
 import torch
 import os
 import numpy as np
+import cv2
 
 from torch.utils.data import DataLoader
 
@@ -104,7 +105,25 @@ def predict_depth(opt):
 
     print(f"-> Computing per image ground truth depth medians")
     gt_depths = np.load(gt_depth_file, fix_imports=True, encoding='latin1', allow_pickle=True)["data"]
-    gt_medians = np.asarray([np.median(gt_depth) for gt_depth in gt_depths])
+    gt_medians = []
+    pred_medians = []
+    for i in range(len(gt_depths)):
+        gt_depth = gt_depths[i]
+        gt_height, gt_width = gt_depth.shape[:2]
+
+        mask = gt_depth > 0
+        gt_depth = gt_depth[mask]
+        gt_medians.append(np.median(gt_depth))
+
+        pred_depth = pred_depths[i]
+        pred_depth = cv2.resize(pred_depth, (gt_width, gt_height))
+        pred_depth = pred_depth[mask]
+
+        pred_median = np.median(pred_depth)
+        pred_medians.append(pred_median)
+
+    gt_medians = np.asarray(gt_medians)
+    pred_medians = np.asarray(pred_medians)
 
     oxts_list = {key: np.concatenate([value[key] for value in oxts_list]) for key in oxts_list[0]}
 
@@ -114,7 +133,8 @@ def predict_depth(opt):
         "inv_K": inv_Ks,
         "oxts": oxts_list,
         "color": color_images,
-        "gt_medians": gt_medians
+        "gt_medians": gt_medians,
+        "pred_medians": pred_medians
     }
 
     if opt.save_pred_disps:
