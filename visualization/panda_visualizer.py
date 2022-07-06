@@ -24,41 +24,25 @@ ON = 1
 OFF = 0
 
 
-def turn_pose(pose):
-    """
-    First switches y and z components and the invert the z component to make the pose stand upright,
-    where the head is in positive z direction.
-    :param pose:
-    :return:
-    """
-    if len(pose.shape) == 2:
-        pose = pose[:, [0, 2, 1]] * np.array([1, 1, -1])
-    elif len(pose.shape) == 3:
-        pose = pose[:, :, [0, 2, 1]] * np.array([1, 1, -1])
-    elif len(pose.shape) == 4:
-        pose = pose[:, :, :, [0, 2, 1]] * np.array([1, 1, -1])
-    else:
-        raise Exception("Not implemented {}".format(len(pose.shape)))
-    return pose
-
-
 class Visualizer(ControllableShowBase):
 
     def __init__(self, data):
         ControllableShowBase.__init__(self)
 
+        self.SINGLE_STEP = 0
+        self.MULTI_STEP = 1
+
         self.data = data
         self.base_sphere_scale = 0.01
-
-        self.root = NodePath('Depth 0')
 
         axes_node = self.create_axes_and_grid(length=20)
         axes_node.reparentTo(self.root)
 
         self.depth_node = None
+        self.render_fn = None
 
         self.step_num = 0
-        self.downscale = 6
+        self.downscale = 8
         self.predicted_depths = self.data['depth']
         self.coords_3d = compute_3d_coordinates(self.data, downscale=self.downscale, global_coordinates=True)
         self.colors = np.asarray([self.compute_coloring(d, self.downscale) for d in self.predicted_depths])
@@ -73,57 +57,48 @@ class Visualizer(ControllableShowBase):
         colors = mapper.to_rgba(depths)[:, :, :3]
         return np.swapaxes(colors, 0, 1)
 
+    def _render(self):
+        self.depth_node.removeNode()
+        self.depth_node = self.render_fn()
+        self.depth_node.reparentTo(self.root)
+
     def next_step(self):
         self.step_num = (self.step_num + 1) % len(self.coords_3d)
-
-        self.depth_node.removeNode()
-        self.depth_node = self._render_single_depth_map()
-        self.depth_node.reparentTo(self.root)
+        self._render()
 
     def previous_step(self):
         self.step_num = (self.step_num - 1) % len(self.coords_3d)
+        self._render()
 
-        self.depth_node.removeNode()
-        self.depth_node = self._render_single_depth_map()
-        self.depth_node.reparentTo(self.root)
-
-    def visualize_multi_step(self, step_num=0):
-        self.step_num = step_num
-
-        self.accept('n', self.next_step)
-        self.accept('n-repeat', self.next_step)
-        self.accept('b', self.previous_step)
-        self.accept('b-repeat', self.previous_step)
-
-        pose_node = self._render_three_depth_maps()
-
-
-        pose_node.reparentTo(self.root)
-        self.camera.reparentTo(self.root)
-        self.setBackgroundColor(200, 200, 200)        # swap z and y axis
-
-    def visualize_single_step(self, step_num=0):
+    def visualize_with_steps(self, mode, step_num=0):
         """
         Create simple animation of back projected 3D points without accounting for relative position change.
         """
         self.step_num = step_num
 
+        if mode == self.SINGLE_STEP:
+            self.render_fn = self._render_single_depth_map
+        elif mode == self.MULTI_STEP:
+            self.render_fn = self._render_three_depth_maps
+        else:
+            raise Exception(f'Unknown mode {mode}!')
+
         self.accept('n', self.next_step)
         self.accept('n-repeat', self.next_step)
         self.accept('b', self.previous_step)
         self.accept('b-repeat', self.previous_step)
 
-        pose_node = self._render_single_depth_map()
+        self.depth_node = self.render_fn()
+        self.depth_node.reparentTo(self.root)
 
-        pose_node.reparentTo(self.root)
         self.camera.reparentTo(self.root)
-        self.setBackgroundColor(200, 200, 200)        # swap z and y axis
+        self.setBackgroundColor(200, 200, 200)  # swap z and y axis
         # coords = coords[..., [0, 2, 1]]
         # coords[..., 2] *= -1
 
-    def _render_single_depth_map(self, use_relative_depths=False):
+    def _render_single_depth_map(self, use_relative_depths=False, alpha=1.0):
         """
-        Renders the given 3d coordinates as a point cloud.
+        Renders the 3d coordinates at the current step as a point cloud.
         """
         coords_3d = self.coords_3d[self.step_num]
         # compute colors
@@ -148,11 +123,27 @@ class Visualizer(ControllableShowBase):
 
                 # sphere.setTexture(texture, 0)
                 sphere.setPos(*coords_3d[i, j])
-                sphere.setColor(*colors[i, j])
+                sphere.setTransparency(True)
+                sphere.setColor(*colors[i, j], alpha)
 
         return self.depth_node
 
     def _render_three_depth_maps(self):
-        pass
+        old_step_num = self.step_num
+        if self.step_num == 0:
+            indices = [self.step_num, self.step_num + 1]
+        elif self.step_num == len(self.coords_3d) - 1:
+            indices = [self.step_num - 1, self.step_num]
+        else:
+            indices = [self.step_num - 1, self.step_num, self.step_num + 1]
 
+        collector_node = NodePath('collector node')
+
+        for j, i in enumerate(indices):
+            self.step_num = i
+            node = self._render_single_depth_map(alpha=(j+1)/(len(indices) + 1))
+            node.reparentTo(collector_node)
+
+        self.step_num = old_step_num
+        return collector_node
 
