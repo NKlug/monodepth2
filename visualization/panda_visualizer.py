@@ -8,6 +8,7 @@ import cv2
 import matplotlib as mpl
 import matplotlib.cm as cm
 import scipy.spatial as spat
+import tqdm
 
 from visualization.compute_3d_coordinates import compute_3d_coordinates
 from visualization.controllable_show_base import ControllableShowBase
@@ -26,7 +27,7 @@ OFF = 0
 
 class Visualizer(ControllableShowBase):
 
-    def __init__(self, data):
+    def __init__(self, data, precompute_nodes=True):
         ControllableShowBase.__init__(self)
 
         self.SINGLE_STEP = 0
@@ -41,11 +42,22 @@ class Visualizer(ControllableShowBase):
         self.depth_node = None
         self.render_fn = None
 
+        print('-> Preparing data')
+
         self.step_num = 0
         self.downscale = 8
         self.predicted_depths = self.data['depth']
         self.coords_3d = compute_3d_coordinates(self.data, downscale=self.downscale, global_coordinates=True)
         self.colors = np.asarray([self.compute_coloring(d, self.downscale) for d in self.predicted_depths])
+
+        self.nodes = [None] * len(self.coords_3d)
+        self.render_single_fn = None
+        if precompute_nodes:
+            self._prepare_nodes()
+            print("-> All nodes ready.")
+            self.render_single_fn = self._show_single_depth_map
+        else:
+            self.render_single_fn = self._render_single_depth_map
 
     def compute_coloring(self, depths, downscale=1):
         h, w = depths.shape[:2]
@@ -58,7 +70,7 @@ class Visualizer(ControllableShowBase):
         return np.swapaxes(colors, 0, 1)
 
     def _render(self):
-        self.depth_node.removeNode()
+        self.depth_node.detachNode()
         self.depth_node = self.render_fn()
         self.depth_node.reparentTo(self.root)
 
@@ -77,7 +89,7 @@ class Visualizer(ControllableShowBase):
         self.step_num = step_num
 
         if mode == self.SINGLE_STEP:
-            self.render_fn = self._render_single_depth_map
+            self.render_fn = self.render_single_fn
         elif mode == self.MULTI_STEP:
             self.render_fn = self._render_three_depth_maps
         else:
@@ -96,10 +108,27 @@ class Visualizer(ControllableShowBase):
         # coords = coords[..., [0, 2, 1]]
         # coords[..., 2] *= -1
 
+    def _prepare_nodes(self):
+        old_step = self.step_num
+        for i in tqdm.tqdm(range(len(self.coords_3d)), desc="-> Preparing nodes ", colour='white'):
+            self.step_num = i
+            self.nodes[i] = self._render_single_depth_map()
+
+        self.step_num = old_step
+
+    def _show_single_depth_map(self, alpha=1.0):
+        node = self.nodes[self.step_num]
+        node.setTransparency(True)
+        node.setSa(alpha)
+        return node
+
     def _render_single_depth_map(self, use_relative_depths=True, alpha=1.0):
         """
         Renders the 3d coordinates at the current step as a point cloud.
         """
+        if self.nodes[self.step_num] is not None:
+            return self.nodes[self.step_num]
+
         coords_3d = self.coords_3d[self.step_num]
         # compute colors
         relative_depths = self.predicted_depths[self.step_num]
@@ -133,6 +162,7 @@ class Visualizer(ControllableShowBase):
                 sphere.setTransparency(True)
                 sphere.setColor(*colors[i, j], alpha)
 
+        self.nodes[self.step_num] = self.depth_node
         return self.depth_node
 
     def _render_three_depth_maps(self):
@@ -148,9 +178,8 @@ class Visualizer(ControllableShowBase):
 
         for j, i in enumerate(indices):
             self.step_num = i
-            node = self._render_single_depth_map(alpha=(j+1)/(len(indices) + 1))
+            node = self.render_single_fn(alpha=(j + 1) / (len(indices) + 1))
             node.reparentTo(collector_node)
 
         self.step_num = old_step_num
         return collector_node
-

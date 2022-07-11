@@ -6,7 +6,7 @@ from direct.showbase.Loader import Loader
 from panda3d.core import *
 import numpy as np
 
-SIZE = 800
+SIZE = 1500
 FORWARD = 'forward'
 BACKWARD = 'backward'
 LEFT = 'left'
@@ -34,7 +34,8 @@ class ControllableShowBase(ShowBase):
         self.fps = 30
 
         self.rotation_speed = 10
-        self.move_speed = 0.2
+        self.xy_move_speed = 0.2
+        self.z_move_speed = 0.05
         self.cam_speed = 2
 
         self.configure()
@@ -66,8 +67,10 @@ class ControllableShowBase(ShowBase):
     def create_window(self):
         wp = WindowProperties()
         wp.setTitle('3D depths')
-        wp.setSize(SIZE, SIZE)
-        wp.setOrigin(50, 50)
+        height = self.pipe.getDisplayHeight()
+        width = self.pipe.getDisplayWidth()
+        wp.setSize(width, height)
+        wp.setOrigin(0, 0)
         self.disableMouse()
         wp.setCursorHidden(True)
         wp.setMouseMode(WindowProperties.MRelative)
@@ -128,7 +131,9 @@ class ControllableShowBase(ShowBase):
         else:
             return Task.cont
 
-        self.camera_position = self.camera_position + self.move_speed * direction
+        speed = self.z_move_speed if self.control_map[UP] == ON or self.control_map[DOWN] == ON else self.xy_move_speed
+
+        self.camera_position = self.camera_position + speed * direction
         self.camera.setPos(*self.camera_position)
         self.camera.setHpr(self.yaw, self.pitch, 0)
 
