@@ -118,7 +118,7 @@ class Visualizer(ControllableShowBase):
         for i in range(w):
             for j in range(h):
                 sphere = self.loader.loadModel('smiley')
-                # texture = self.loader.loadTexture('maps/Dirlight.png')
+                texture = self.loader.loadTexture('../assets/sphere.rgb')
 
                 sphere.reparentTo(self.depth_node)
 
@@ -128,7 +128,7 @@ class Visualizer(ControllableShowBase):
                     sphere.setScale(scale[i, j])
                     # sphere.setScale(np.maximum(0.01, np.random.normal(0.03, 0.01)))
 
-                # sphere.setTexture(texture, 0)
+                sphere.setTexture(texture, 1)
                 sphere.setPos(*coords_3d[i, j])
                 sphere.setTransparency(True)
                 sphere.setColor(*colors[i, j], alpha)
