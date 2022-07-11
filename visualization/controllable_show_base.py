@@ -1,3 +1,4 @@
+from direct.gui.OnscreenText import OnscreenText
 from direct.showbase.ShowBase import ShowBase
 from direct.showbase.ShowBase import ShowBase
 from direct.showbase.ShowBaseGlobal import globalClock
@@ -39,6 +40,18 @@ class ControllableShowBase(ShowBase):
         self.cam_speed = 2
 
         self.configure()
+        self.create_hints()
+
+    def addInstructions(self, pos, msg):
+        text = OnscreenText(text=msg, style=1, fg=(0, 0, 0, 1),
+                            pos=(0.03, pos), align=TextNode.ALeft, scale=.04)
+        text.reparentTo(self.a2dLeftCenter)
+        return text
+
+    def create_hints(self):
+        self.addInstructions(0.95, "Q: Quit")
+        self.addInstructions(0.90, "W A S D: forward, left, back, and right movement.")
+        self.addInstructions(0.85, "X C: down and up movement.")
 
     def create_light(self):
         ambientLight = AmbientLight("ambientLight")

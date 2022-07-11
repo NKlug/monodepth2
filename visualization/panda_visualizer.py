@@ -99,6 +99,7 @@ class Visualizer(ControllableShowBase):
         self.accept('n-repeat', self.next_step)
         self.accept('b', self.previous_step)
         self.accept('b-repeat', self.previous_step)
+        self.addInstructions(0.80, "B N: previous and next frame.")
 
         self.depth_node = self.render_fn()
         self.depth_node.reparentTo(self.root)
