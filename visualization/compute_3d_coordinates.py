@@ -33,6 +33,8 @@ def compute_3d_coordinates(data, downscale=1, global_coordinates=False, max_dept
 
     predicted_depths = data["depth"]
     lat, lon, alt, roll, pitch, yaw = get_global_coords(data)
+    position = np.stack([lat, lon, alt], axis=-1)
+    orientation = np.stack([roll, pitch, yaw], axis=-1)
 
     coords = []
 
@@ -43,8 +45,7 @@ def compute_3d_coordinates(data, downscale=1, global_coordinates=False, max_dept
     scale_factor = gt_median / pred_median
     print(f'-> Scaling predictions with factor {scale_factor}')
     # scale_factor = 30.555
-    lat *= 1/scale_factor
-    lon *= 1/scale_factor
+    position[:, :2] *= 1/scale_factor
 
     for i, predicted_depth in enumerate(predicted_depths):
 
@@ -58,13 +59,11 @@ def compute_3d_coordinates(data, downscale=1, global_coordinates=False, max_dept
             coords_3d = image_to_imu_coordinates(coords_3d)
 
             # compute coordinates in global coordinate system
-            position = np.asarray([lat[i], lon[i], alt[i]])
-            orientation = np.asarray([roll[i], pitch[i], yaw[i]])
-            rot = spat.transform.Rotation.from_euler('xyz', orientation).as_matrix()
+            rot = spat.transform.Rotation.from_euler('xyz', orientation[i]).as_matrix()
 
             global2imu = np.eye(4)
             global2imu[:3, :3] = rot
-            global2imu[:3, 3] = position
+            global2imu[:3, 3] = position[i]
             imu2global = np.linalg.inv(global2imu)
             imu2global = global2imu
 
@@ -79,7 +78,7 @@ def compute_3d_coordinates(data, downscale=1, global_coordinates=False, max_dept
 
         coords.append(coords_3d)
 
-    return np.asarray(coords)
+    return np.asarray(coords), position, orientation
 
 
 def back_project_orthographic(predicted_depth, f=5, downscale=4, *args, **kwargs):

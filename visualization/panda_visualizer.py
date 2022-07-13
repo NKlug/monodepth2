@@ -54,7 +54,9 @@ class Visualizer(ControllableShowBase):
         self.step_num = 0
         self.downscale = 8
         self.predicted_depths = self.data['depth']
-        self.coords_3d = compute_3d_coordinates(self.data, downscale=self.downscale, global_coordinates=True)
+        self.coords_3d, self.position, self.orientation = compute_3d_coordinates(self.data, downscale=self.downscale,
+                                                                                 global_coordinates=True)
+
         self.colors = np.asarray([self.compute_coloring(d, self.downscale) for d in self.predicted_depths])
 
         self.nodes = [None] * len(self.coords_3d)
