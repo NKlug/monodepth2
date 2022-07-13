@@ -69,20 +69,20 @@ class Visualizer(ControllableShowBase):
         colors = mapper.to_rgba(depths)[:, :, :3]
         return np.swapaxes(colors, 0, 1)
 
-    def _render(self):
+    def _render(self, *args, **kwargs):
         self.depth_node.detachNode()
-        self.depth_node = self.render_fn()
+        self.depth_node = self.render_fn(*args, **kwargs)
         self.depth_node.reparentTo(self.root)
 
-    def next_step(self):
+    def next_step(self, args, kwargs):
         self.step_num = (self.step_num + 1) % len(self.coords_3d)
-        self._render()
+        self._render(*args, **kwargs)
 
-    def previous_step(self):
+    def previous_step(self, args, kwargs):
         self.step_num = (self.step_num - 1) % len(self.coords_3d)
-        self._render()
+        self._render(*args, **kwargs)
 
-    def visualize_with_steps(self, mode, step_num=0):
+    def visualize_with_steps(self, mode, step_num=0, *args, **kwargs):
         """
         Create simple animation of back projected 3D points without accounting for relative position change.
         """
@@ -95,13 +95,13 @@ class Visualizer(ControllableShowBase):
         else:
             raise Exception(f'Unknown mode {mode}!')
 
-        self.accept('n', self.next_step)
-        self.accept('n-repeat', self.next_step)
-        self.accept('b', self.previous_step)
-        self.accept('b-repeat', self.previous_step)
+        self.accept('n', self.next_step, [args, kwargs])
+        self.accept('n-repeat', self.next_step, [args, kwargs])
+        self.accept('b', self.previous_step, [args, kwargs])
+        self.accept('b-repeat', self.previous_step, [args, kwargs])
         self.addInstructions(0.80, "B N: previous and next frame.")
 
-        self.depth_node = self.render_fn()
+        self.depth_node = self.render_fn(*args, **kwargs)
         self.depth_node.reparentTo(self.root)
 
         self.camera.reparentTo(self.root)
@@ -117,13 +117,13 @@ class Visualizer(ControllableShowBase):
 
         self.step_num = old_step
 
-    def _show_single_depth_map(self, alpha=1.0):
+    def _show_single_depth_map(self, alpha=1.0, *args, **kwargs):
         node = self.nodes[self.step_num]
         node.setTransparency(True)
         node.setSa(alpha)
         return node
 
-    def _render_single_depth_map(self, use_relative_depths=True, alpha=1.0):
+    def _render_single_depth_map(self, use_relative_depths=True, alpha=1.0, *args, **kwargs):
         """
         Renders the 3d coordinates at the current step as a point cloud.
         """
@@ -145,6 +145,17 @@ class Visualizer(ControllableShowBase):
         scale = np.maximum(scale, 0.005)
         scale = np.minimum(scale, 0.1)
 
+        self._render_frame_as_scatter(alpha, colors, coords_3d, scale, use_relative_depths)
+
+        self.nodes[self.step_num] = self.depth_node
+        return self.depth_node
+
+    def _render_frame_as_mesh(self):
+        pass
+
+    def _render_frame_as_scatter(self, alpha, colors, coords_3d, scale, use_relative_depths):
+        w, h = coords_3d.shape[:2]
+
         for i in range(w):
             for j in range(h):
                 sphere = self.loader.loadModel('smiley')
@@ -163,17 +174,13 @@ class Visualizer(ControllableShowBase):
                 sphere.setTransparency(True)
                 sphere.setColor(*colors[i, j], alpha)
 
-        self.nodes[self.step_num] = self.depth_node
-        return self.depth_node
-
-    def _render_three_depth_maps(self):
+    def _render_three_depth_maps(self, interval_step=1, *args, **kwargs):
         old_step_num = self.step_num
-        if self.step_num == 0:
-            indices = [self.step_num, self.step_num + 1]
-        elif self.step_num == len(self.coords_3d) - 1:
-            indices = [self.step_num - 1, self.step_num]
-        else:
-            indices = [self.step_num - 1, self.step_num, self.step_num + 1]
+        indices = [self.step_num]
+        if self.step_num - interval_step >= 0:
+            indices.insert(0, self.step_num - interval_step)
+        if self.step_num + interval_step < len(self.coords_3d):
+            indices.append(self.step_num + interval_step)
 
         collector_node = NodePath('collector node')
 

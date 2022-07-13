@@ -35,7 +35,7 @@ class ControllableShowBase(ShowBase):
         self.fps = 30
 
         self.rotation_speed = 10
-        self.xy_move_speed = 0.2
+        self.xy_move_speed = 0.1
         self.z_move_speed = 0.05
         self.cam_speed = 2
 
