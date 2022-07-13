@@ -32,20 +32,25 @@ def compute_3d_coordinates(data, downscale=1, global_coordinates=False, max_dept
     back_project_fn = back_project_perspective
 
     predicted_depths = data["depth"]
-    lat, lon, alt, roll, pitch, yaw = get_global_coords(data)
-    position = np.stack([lat, lon, alt], axis=-1)
-    orientation = np.stack([roll, pitch, yaw], axis=-1)
+
+    if global_coordinates:
+        lat, lon, alt, roll, pitch, yaw = get_global_coords(data)
+        position = np.stack([lat, lon, alt], axis=-1)
+        orientation = np.stack([roll, pitch, yaw], axis=-1)
+        # downscale lat and lon such that to ground truth and predicted median depths match
+        # see evaluate_depth.py lines 205 ff.
+        gt_median = np.mean(data["gt_medians"])
+        pred_median = np.mean(data["pred_medians"])
+        scale_factor = gt_median / pred_median
+        print(f'-> Scaling predictions with factor {scale_factor}')
+        # scale_factor = 30.555
+        position[:, :2] *= 1/scale_factor
+    else:
+        position = np.zeros((len(predicted_depths), 3))
+        position[:, 2] = 1
+        orientation = np.zeros((len(predicted_depths), 3))
 
     coords = []
-
-    # downscale lat and lon such that to ground truth and predicted median depths match
-    # see evaluate_depth.py lines 205 ff.
-    gt_median = np.mean(data["gt_medians"])
-    pred_median = np.mean(data["pred_medians"])
-    scale_factor = gt_median / pred_median
-    print(f'-> Scaling predictions with factor {scale_factor}')
-    # scale_factor = 30.555
-    position[:, :2] *= 1/scale_factor
 
     for i, predicted_depth in enumerate(predicted_depths):
 
@@ -54,9 +59,9 @@ def compute_3d_coordinates(data, downscale=1, global_coordinates=False, max_dept
 
         inv_K = data['inv_K'][i]
         coords_3d = back_project_fn(predicted_depth, downscale=downscale, inv_K=inv_K)
+        coords_3d = image_to_imu_coordinates(coords_3d)
 
         if global_coordinates:
-            coords_3d = image_to_imu_coordinates(coords_3d)
 
             # compute coordinates in global coordinate system
             rot = spat.transform.Rotation.from_euler('xyz', orientation[i]).as_matrix()
