@@ -11,8 +11,11 @@ def generate_split_file(split_filename, folder, side, opt):
     os.makedirs(os.path.dirname(split_filename), exist_ok=True)
     with open(os.path.join(split_filename), 'w') as split_file:
         for image_name in glob.glob(image_directory):
+            relative_image_path = folder.replace(opt.data_path, '')
+            if relative_image_path.startswith('/'):
+                relative_image_path = relative_image_path[1:]
             index = os.path.basename(image_name).split('.')[0]
-            split_file.write(f'{folder} {index} {side}\n')
+            split_file.write(f'{relative_image_path} {index} {side}\n')
 
 
 if __name__ == '__main__':
