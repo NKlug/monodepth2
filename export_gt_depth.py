@@ -28,7 +28,7 @@ def export_gt_depths_kitti(opt):
         folder, frame_id, _ = line.split()
         frame_id = int(frame_id)
 
-        if opt.split == "eigen" or opt.split == "sequence":
+        if opt.split == "eigen" or opt.split == "sequence" or '_drive_' in opt.split:
             calib_dir = os.path.join(opt.data_path, folder.split("/")[0])
             velo_filename = os.path.join(opt.data_path, folder,
                                          "velodyne_points/data", "{:010d}.bin".format(frame_id))
@@ -37,6 +37,8 @@ def export_gt_depths_kitti(opt):
             gt_depth_path = os.path.join(opt.data_path, folder, "proj_depth",
                                          "groundtruth", "image_02", "{:010d}.png".format(frame_id))
             gt_depth = np.array(pil.open(gt_depth_path)).astype(np.float32) / 256
+        else:
+            raise Exception('Unknown split!')
 
         gt_depths.append(gt_depth.astype(np.float32))
 

@@ -36,9 +36,9 @@ def predict_depth(opt):
 
     encoder_dict = torch.load(encoder_path)
 
-    filenames = readlines(os.path.join(splits_dir, options.eval_split, "test_files.txt"))
+    filenames = readlines(os.path.join(splits_dir, opt.split, "test_files.txt"))
     # noinspection DuplicatedCode
-    data = datasets.KITTIRAWDataset(options.data_path, filenames,
+    data = datasets.KITTIRAWDataset(opt.data_path, filenames,
                                     encoder_dict['height'], encoder_dict['width'],
                                     [0], 4, is_train=False)
     dataloader = DataLoader(data, 16, shuffle=False, num_workers=opt.num_workers,
@@ -139,7 +139,7 @@ def predict_depth(opt):
 
     if opt.save_pred_disps:
         output_path = os.path.join(
-            opt.load_weights_folder, "predicted_depths_{}_split.pkl".format(opt.eval_split))
+            opt.load_weights_folder, "predicted_depths_{}_split.pkl".format(opt.split))
         print("-> Saving predicted disparities to ", output_path)
         with open(output_path, 'wb') as out_file:
             pickle.dump(outputs, out_file)
