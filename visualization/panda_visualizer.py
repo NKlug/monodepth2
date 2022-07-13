@@ -1,14 +1,10 @@
-from direct.showbase.ShowBase import ShowBase
-from direct.showbase.ShowBaseGlobal import globalClock
-from direct.task import Task
-from direct.showbase.Loader import Loader
-from panda3d.core import *
-import numpy as np
 import cv2
 import matplotlib as mpl
 import matplotlib.cm as cm
-import scipy.spatial as spat
+import numpy as np
 import tqdm
+from direct.task import Task
+from panda3d.core import *
 
 from visualization.compute_3d_coordinates import compute_3d_coordinates
 from visualization.controllable_show_base import ControllableShowBase
@@ -27,7 +23,7 @@ OFF = 0
 
 class Visualizer(ControllableShowBase):
 
-    def __init__(self, data, precompute_nodes=True, render_mode='scatter'):
+    def __init__(self, data, precompute_nodes=True, render_mode='scatter', global_coordinates=True):
         ControllableShowBase.__init__(self)
 
         self._render_frame_map = {
@@ -42,6 +38,7 @@ class Visualizer(ControllableShowBase):
         self.base_sphere_scale = 0.01
 
         self.render_mode = render_mode
+        self.global_coordinates = global_coordinates
 
         axes_node = self.create_axes_and_grid(length=20)
         axes_node.reparentTo(self.root)
@@ -55,7 +52,9 @@ class Visualizer(ControllableShowBase):
         self.downscale = 8
         self.predicted_depths = self.data['depth']
         self.coords_3d, self.position, self.orientation = compute_3d_coordinates(self.data, downscale=self.downscale,
-                                                                                 global_coordinates=True)
+                                                                                 global_coordinates=self.global_coordinates)
+
+        # self.coords_3d, self.position, self.orientation = self.coords_3d[:5], self.position[:5], self.orientation[:5]
 
         self.colors = np.asarray([self.compute_coloring(d, self.downscale) for d in self.predicted_depths])
 
@@ -77,6 +76,67 @@ class Visualizer(ControllableShowBase):
         mapper = cm.ScalarMappable(norm=normalizer, cmap='magma')
         colors = mapper.to_rgba(depths)[:, :, :3]
         return np.swapaxes(colors, 0, 1)
+
+    def visualize_with_animation(self, delay=200, step_num=0, *args, **kwargs):
+        """
+        Animates the 3d depth maps with automated camera movement.
+        :param delay: delay between two frames in milliseconds
+        :param step_num: starting step
+        """
+        self.step_num = step_num
+
+        # prepare nodes if not available already
+        if None in self.nodes:
+            self._prepare_nodes()
+
+        self.render_fn = self._show_single_depth_map
+
+        self.camera.reparentTo(self.root)
+        self.setBackgroundColor(200, 200, 200)
+
+        self.yaw = self.orientation[self.step_num, 2] + 100
+        self.pitch = np.maximum(self.orientation[self.step_num, 1] - 10, -90)
+        self.camera.setHpr(self.yaw, self.pitch, 0)
+
+        yaw = self.yaw / 180 * np.pi
+        look_at_direction = np.asarray([-np.sin(yaw), np.cos(yaw), 0])
+        look_at_direction = look_at_direction / np.linalg.norm(look_at_direction)
+
+        right_direction = look_at_direction[[1, 0, 2]]
+        right_direction[1] *= -1
+
+        self.camera_position = self.position[self.step_num] + 0.3 * look_at_direction + \
+                               -0.2 * right_direction + 1 * np.asarray([0, 0, 1.4])
+        self.camera.setPos(*self.camera_position)
+
+        self.taskMgr.doMethodLater(delay / 1000, self._animate_task, 'animateTask')
+
+    def _animate_task(self, task, *args, **kwargs):
+        self.step_num = (self.step_num + 1) % len(self.coords_3d)
+
+        yaw = self.yaw / 180 * np.pi
+        look_at_direction = np.asarray([-np.sin(yaw), np.cos(yaw), 0])
+        look_at_direction = look_at_direction / np.linalg.norm(look_at_direction)
+
+        right_direction = look_at_direction[[1, 0, 2]]
+        right_direction[1] *= -1
+
+        self.camera_position[:2] = (self.position[self.step_num] + 0.4 * look_at_direction + -0.2 * right_direction)[:2]
+        self.camera.setPos(*self.camera_position)
+
+        self._render(*args, **kwargs)
+
+        return Task.again
+        # time = task.time
+        # angle = time / self.fps * self.rotation_speed % 360
+        # for cam in self.camList:
+        #     cam_position = np.asarray(cam.getPos())
+        #     radius = np.linalg.norm(cam_position[:2])
+        #     cam.setPos(np.cos(angle) * radius,
+        #                np.sin(angle) * radius,
+        #                cam_position[2])
+        #     cam.lookAt(0, 0, 0)
+        # return Task.cont
 
     def _render(self, *args, **kwargs):
         self.depth_node.detachNode()
