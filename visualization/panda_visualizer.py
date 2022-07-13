@@ -27,14 +27,21 @@ OFF = 0
 
 class Visualizer(ControllableShowBase):
 
-    def __init__(self, data, precompute_nodes=True):
+    def __init__(self, data, precompute_nodes=True, render_mode='scatter'):
         ControllableShowBase.__init__(self)
+
+        self._render_frame_map = {
+            'scatter': self._render_frame_as_scatter,
+            'mesh': self._render_frame_as_mesh
+        }
 
         self.SINGLE_STEP = 0
         self.MULTI_STEP = 1
 
         self.data = data
         self.base_sphere_scale = 0.01
+
+        self.render_mode = render_mode
 
         axes_node = self.create_axes_and_grid(length=20)
         axes_node.reparentTo(self.root)
@@ -109,11 +116,11 @@ class Visualizer(ControllableShowBase):
         # coords = coords[..., [0, 2, 1]]
         # coords[..., 2] *= -1
 
-    def _prepare_nodes(self):
+    def _prepare_nodes(self, *args, **kwargs):
         old_step = self.step_num
         for i in tqdm.tqdm(range(len(self.coords_3d)), desc="-> Preparing nodes ", colour='white'):
             self.step_num = i
-            self.nodes[i] = self._render_single_depth_map()
+            self.nodes[i] = self._render_single_depth_map(*args, **kwargs)
 
         self.step_num = old_step
 
@@ -145,23 +152,43 @@ class Visualizer(ControllableShowBase):
         scale = np.maximum(scale, 0.005)
         scale = np.minimum(scale, 0.1)
 
-        self._render_frame_as_scatter(alpha, colors, coords_3d, scale, use_relative_depths)
+        frame_node = self._render_frame_map[self.render_mode](alpha, colors, coords_3d, scale, use_relative_depths,
+                                                              *args,
+                                                              **kwargs)
+        frame_node.reparentTo(self.depth_node)
 
         self.nodes[self.step_num] = self.depth_node
         return self.depth_node
 
-    def _render_frame_as_mesh(self):
-        pass
+    def _render_frame_as_mesh(self, alpha, colors, coords_3d, *args, **kwargs):
+        w, h = coords_3d.shape[:2]
+        ls = LineSegs()
+        ls.setThickness(2)
+
+        for i in range(w):
+            for j in range(h):
+                ls.setColor(*colors[i, j], alpha)
+
+                if i < w - 1:
+                    ls.move_to(*coords_3d[i, j])
+                    ls.draw_to(*coords_3d[i + 1, j])
+
+                if j < h - 1:
+                    ls.move_to(*coords_3d[i, j])
+                    ls.draw_to(*coords_3d[i, j + 1])
+
+        return NodePath(ls.create())
 
     def _render_frame_as_scatter(self, alpha, colors, coords_3d, scale, use_relative_depths):
         w, h = coords_3d.shape[:2]
+        frame_node = NodePath('frame node')
 
         for i in range(w):
             for j in range(h):
                 sphere = self.loader.loadModel('smiley')
                 texture = self.loader.loadTexture('../assets/sphere.rgb')
 
-                sphere.reparentTo(self.depth_node)
+                sphere.reparentTo(frame_node)
 
                 if not use_relative_depths:
                     sphere.setScale(self.base_sphere_scale)
@@ -173,6 +200,8 @@ class Visualizer(ControllableShowBase):
                 sphere.setPos(*coords_3d[i, j])
                 sphere.setTransparency(True)
                 sphere.setColor(*colors[i, j], alpha)
+
+        return frame_node
 
     def _render_three_depth_maps(self, interval_step=1, *args, **kwargs):
         old_step_num = self.step_num
@@ -186,7 +215,7 @@ class Visualizer(ControllableShowBase):
 
         for j, i in enumerate(indices):
             self.step_num = i
-            node = self.render_single_fn(alpha=(j + 1) / (len(indices) + 1))
+            node = self.render_single_fn(alpha=(j + 1) / (len(indices) + 1), *args, **kwargs)
             node.reparentTo(collector_node)
 
         self.step_num = old_step_num

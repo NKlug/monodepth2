@@ -22,6 +22,6 @@ if __name__ == '__main__':
         # visualizer.simple_visualize_sequence()
         # visualizer.visualize_with_steps()
 
-        app = PandaVisualizer(data, precompute_nodes=False)
+        app = PandaVisualizer(data, precompute_nodes=False, render_mode='scatter')
         app.visualize_with_steps(app.MULTI_STEP, step_num=1, interval_step=1)
         app.run()

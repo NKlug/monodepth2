@@ -163,6 +163,7 @@ class ControllableShowBase(ShowBase):
             yaw, pitch, roll = self.camera.getHpr()
             self.yaw = ((yaw + 180 + (-1) * self.cam_speed * 1e-2 * deltaX) % 360) - 180
             self.pitch = ((pitch + 180 + (-1) * self.cam_speed * 1e-2 * deltaY) % 360) - 180
+            self.pitch = np.minimum(np.maximum(self.pitch, -90), 90)
             self.camera.setHpr(self.yaw, self.pitch, roll)
 
     def auto_rotate(self, task):
