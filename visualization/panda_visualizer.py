@@ -23,7 +23,8 @@ OFF = 0
 
 class Visualizer(ControllableShowBase):
 
-    def __init__(self, data, precompute_nodes=True, render_mode='scatter', global_coordinates=True):
+    def __init__(self, data, precompute_nodes=True, render_mode='scatter', color_mode='depth', global_coordinates=True,
+                 max_depth=100):
         ControllableShowBase.__init__(self)
 
         self._render_frame_map = {
@@ -39,6 +40,7 @@ class Visualizer(ControllableShowBase):
 
         self.render_mode = render_mode
         self.global_coordinates = global_coordinates
+        self.max_depth = max_depth
 
         axes_node = self.create_axes_and_grid(length=20)
         axes_node.reparentTo(self.root)
@@ -49,14 +51,21 @@ class Visualizer(ControllableShowBase):
         print('-> Preparing data')
 
         self.step_num = 0
-        self.downscale = 8
+        self.downscale = 5
         self.predicted_depths = self.data['depth']
         self.coords_3d, self.position, self.orientation = compute_3d_coordinates(self.data, downscale=self.downscale,
                                                                                  global_coordinates=self.global_coordinates)
 
         # self.coords_3d, self.position, self.orientation = self.coords_3d[:5], self.position[:5], self.orientation[:5]
 
-        self.colors = np.asarray([self.compute_coloring(d, self.downscale) for d in self.predicted_depths])
+        if color_mode == 'depth':
+            self.colors = np.asarray(
+                [self.compute_depth_coloring(depths=d, downscale=self.downscale) for d in self.predicted_depths])
+        elif color_mode == 'image':
+            self.colors = np.asarray(
+                [self.compute_image_coloring(image=img, downscale=self.downscale) for img in self.data['color']])
+        else:
+            raise Exception("Unknown coloring mode!")
 
         self.nodes = [None] * len(self.coords_3d)
         self.render_single_fn = None
@@ -67,7 +76,7 @@ class Visualizer(ControllableShowBase):
         else:
             self.render_single_fn = self._render_single_depth_map
 
-    def compute_coloring(self, depths, downscale=1):
+    def compute_depth_coloring(self, depths, downscale=1, *args, **kwargs):
         h, w = depths.shape[:2]
         depths = cv2.resize(depths, (w // downscale, h // downscale))
 
@@ -76,6 +85,11 @@ class Visualizer(ControllableShowBase):
         mapper = cm.ScalarMappable(norm=normalizer, cmap='magma')
         colors = mapper.to_rgba(depths)[:, :, :3]
         return np.swapaxes(colors, 0, 1)
+
+    def compute_image_coloring(self, image, downscale=1, *args, **kwargs):
+        image = image.T
+        h, w = image.shape[:2]
+        return cv2.resize(image, (w // downscale, h // downscale))
 
     def visualize_with_animation(self, delay=200, step_num=0, *args, **kwargs):
         """
@@ -192,7 +206,7 @@ class Visualizer(ControllableShowBase):
         node.setSa(alpha)
         return node
 
-    def _render_single_depth_map(self, use_relative_depths=True, alpha=1.0, *args, **kwargs):
+    def _render_single_depth_map(self, use_relative_depths=True, alpha=1.0, color_mode='depth', *args, **kwargs):
         """
         Renders the 3d coordinates at the current step as a point cloud.
         """
@@ -203,6 +217,9 @@ class Visualizer(ControllableShowBase):
         # compute colors
         relative_depths = self.predicted_depths[self.step_num]
         colors = self.colors[self.step_num]
+
+        # cv2.imshow('image', colors)
+        # cv2.waitKey()
 
         self.depth_node = NodePath('depth base node')
 
@@ -215,6 +232,7 @@ class Visualizer(ControllableShowBase):
         scale = np.minimum(scale, 0.1)
 
         frame_node = self._render_frame_map[self.render_mode](alpha, colors, coords_3d, scale, use_relative_depths,
+                                                              relative_depths,
                                                               *args,
                                                               **kwargs)
         frame_node.reparentTo(self.depth_node)
@@ -241,12 +259,15 @@ class Visualizer(ControllableShowBase):
 
         return NodePath(ls.create())
 
-    def _render_frame_as_scatter(self, alpha, colors, coords_3d, scale, use_relative_depths):
+    def _render_frame_as_scatter(self, alpha, colors, coords_3d, scale, use_relative_depths, relative_depths,
+                                 *args, **kwargs):
         w, h = coords_3d.shape[:2]
         frame_node = NodePath('frame node')
 
         for i in range(w):
             for j in range(h):
+                if self.max_depth is not None and relative_depths[i, j] > self.max_depth:
+                    continue
                 sphere = self.loader.loadModel('smiley')
                 texture = self.loader.loadTexture('../assets/sphere.rgb')
 

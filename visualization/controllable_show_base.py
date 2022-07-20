@@ -75,7 +75,7 @@ class ControllableShowBase(ShowBase):
         self.accept('q', self.finalizeExit)
 
         self.configure_camera_controls()
-        self.create_light()
+        # self.create_light()
 
     def create_window(self):
         wp = WindowProperties()
