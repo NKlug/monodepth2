@@ -74,6 +74,8 @@ class ControllableShowBase(ShowBase):
 
         self.accept('q', self.finalizeExit)
 
+        self.setFrameRateMeter(True)
+
         self.configure_camera_controls()
         # self.create_light()
 

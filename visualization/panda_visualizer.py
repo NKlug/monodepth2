@@ -23,8 +23,23 @@ OFF = 0
 
 class Visualizer(ControllableShowBase):
 
-    def __init__(self, data, precompute_nodes=True, render_mode='scatter', color_mode='depth', global_coordinates=True,
-                 max_depth=100):
+    def __init__(self, data, precompute_nodes=True, render_mode='scatter', color_mode='depth', point_type='cube',
+                 global_coordinates=True, downscale_factor=6,
+                 max_depth=1.5, use_relative_depths=False):
+        """
+        Creates the Panda3D Visualizer.
+        @param data: data dictionary
+        @param precompute_nodes: whether to precompute all nodes before visualizing. This means longer a longer loading
+        time, but more fluent rendition.
+        @param render_mode: 'scatter' or 'mesh'. Whether to render the points as a scatter plot or as a mesh.
+        @param color_mode: 'depth' or 'image'. Whether choose the colors relative to the relative depths or to use
+        the colors form the images.
+        @param point_type: 'cube' or 'ball'. Whether to use a cube or a ball to represent a point in space
+        @param global_coordinates: Whether to view the points in the global coordinate system.
+        @param downscale_factor: Factor of how much to downscale the images.
+        @param max_depth: Points with a relative depth greater than max_depth are not displayed.
+        @param use_relative_depths: Whether to scale points relative to their depth.
+        """
         ControllableShowBase.__init__(self)
 
         self._render_frame_map = {
@@ -34,13 +49,15 @@ class Visualizer(ControllableShowBase):
 
         self.SINGLE_STEP = 0
         self.MULTI_STEP = 1
+        self.EVERYTHING = 2
 
         self.data = data
-        self.base_sphere_scale = 0.01
+        self.base_sphere_scale = 0.005
 
         self.render_mode = render_mode
         self.global_coordinates = global_coordinates
         self.max_depth = max_depth
+        self.use_relative_depths = use_relative_depths
 
         axes_node = self.create_axes_and_grid(length=20)
         axes_node.reparentTo(self.root)
@@ -51,12 +68,17 @@ class Visualizer(ControllableShowBase):
         print('-> Preparing data')
 
         self.step_num = 0
-        self.downscale = 5
+        self.downscale = downscale_factor
         self.predicted_depths = self.data['depth']
         self.coords_3d, self.position, self.orientation = compute_3d_coordinates(self.data, downscale=self.downscale,
                                                                                  global_coordinates=self.global_coordinates)
 
-        # self.coords_3d, self.position, self.orientation = self.coords_3d[:5], self.position[:5], self.orientation[:5]
+        if point_type == 'cube':
+            self.model_path = '../assets/cube.egg'
+        elif point_type == 'ball':
+            self.model_path = 'smiley'
+        else:
+            raise Exception(f"Unknown point type {point_type}!")
 
         if color_mode == 'depth':
             self.colors = np.asarray(
@@ -65,7 +87,7 @@ class Visualizer(ControllableShowBase):
             self.colors = np.asarray(
                 [self.compute_image_coloring(image=img, downscale=self.downscale) for img in self.data['color']])
         else:
-            raise Exception("Unknown coloring mode!")
+            raise Exception(f"Unknown coloring mode {color_mode}!")
 
         self.nodes = [None] * len(self.coords_3d)
         self.render_single_fn = None
@@ -141,16 +163,6 @@ class Visualizer(ControllableShowBase):
         self._render(*args, **kwargs)
 
         return Task.again
-        # time = task.time
-        # angle = time / self.fps * self.rotation_speed % 360
-        # for cam in self.camList:
-        #     cam_position = np.asarray(cam.getPos())
-        #     radius = np.linalg.norm(cam_position[:2])
-        #     cam.setPos(np.cos(angle) * radius,
-        #                np.sin(angle) * radius,
-        #                cam_position[2])
-        #     cam.lookAt(0, 0, 0)
-        # return Task.cont
 
     def _render(self, *args, **kwargs):
         self.depth_node.detachNode()
@@ -175,6 +187,8 @@ class Visualizer(ControllableShowBase):
             self.render_fn = self.render_single_fn
         elif mode == self.MULTI_STEP:
             self.render_fn = self._render_three_depth_maps
+        elif mode == self.EVERYTHING:
+            self.render_fn = self._render_everything
         else:
             raise Exception(f'Unknown mode {mode}!')
 
@@ -206,7 +220,7 @@ class Visualizer(ControllableShowBase):
         node.setSa(alpha)
         return node
 
-    def _render_single_depth_map(self, use_relative_depths=True, alpha=1.0, color_mode='depth', *args, **kwargs):
+    def _render_single_depth_map(self, alpha=1.0, *args, **kwargs):
         """
         Renders the 3d coordinates at the current step as a point cloud.
         """
@@ -231,7 +245,7 @@ class Visualizer(ControllableShowBase):
         scale = np.maximum(scale, 0.005)
         scale = np.minimum(scale, 0.1)
 
-        frame_node = self._render_frame_map[self.render_mode](alpha, colors, coords_3d, scale, use_relative_depths,
+        frame_node = self._render_frame_map[self.render_mode](alpha, colors, coords_3d, scale,
                                                               relative_depths,
                                                               *args,
                                                               **kwargs)
@@ -259,7 +273,7 @@ class Visualizer(ControllableShowBase):
 
         return NodePath(ls.create())
 
-    def _render_frame_as_scatter(self, alpha, colors, coords_3d, scale, use_relative_depths, relative_depths,
+    def _render_frame_as_scatter(self, alpha, colors, coords_3d, scale, relative_depths,
                                  *args, **kwargs):
         w, h = coords_3d.shape[:2]
         frame_node = NodePath('frame node')
@@ -268,12 +282,12 @@ class Visualizer(ControllableShowBase):
             for j in range(h):
                 if self.max_depth is not None and relative_depths[i, j] > self.max_depth:
                     continue
-                sphere = self.loader.loadModel('smiley')
-                texture = self.loader.loadTexture('../assets/sphere.rgb')
+                sphere = self.loader.loadModel(self.model_path)
+                texture = self.loader.loadTexture('../assets/mono_color.rgb')
 
                 sphere.reparentTo(frame_node)
 
-                if not use_relative_depths:
+                if not self.use_relative_depths:
                     sphere.setScale(self.base_sphere_scale)
                 else:
                     sphere.setScale(scale[i, j])
@@ -302,4 +316,14 @@ class Visualizer(ControllableShowBase):
             node.reparentTo(collector_node)
 
         self.step_num = old_step_num
+        return collector_node
+
+    def _render_everything(self, *args, **kwargs):
+        collector_node = NodePath('collector node')
+
+        for i in range(len(self.coords_3d)):
+            self.step_num = i
+            node = self.render_single_fn(*args, **kwargs)
+            node.reparentTo(collector_node)
+
         return collector_node
