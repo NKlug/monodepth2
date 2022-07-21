@@ -24,7 +24,7 @@ OFF = 0
 class Visualizer(ControllableShowBase):
 
     def __init__(self, data, precompute_nodes=True, render_mode='scatter', color_mode='depth', point_type='cube',
-                 global_coordinates=True, downscale_factor=6,
+                 global_coordinates=True, downscale_factor=6, base_point_scale=0.005,
                  max_depth=1.5, use_relative_depths=False):
         """
         Creates the Panda3D Visualizer.
@@ -39,6 +39,7 @@ class Visualizer(ControllableShowBase):
         @param downscale_factor: Factor of how much to downscale the images.
         @param max_depth: Points with a relative depth greater than max_depth are not displayed.
         @param use_relative_depths: Whether to scale points relative to their depth.
+        @param base_point_scale: Base size of a point.
         """
         ControllableShowBase.__init__(self)
 
@@ -52,7 +53,7 @@ class Visualizer(ControllableShowBase):
         self.EVERYTHING = 2
 
         self.data = data
-        self.base_sphere_scale = 0.005
+        self.base_point_scale = base_point_scale
 
         self.render_mode = render_mode
         self.global_coordinates = global_coordinates
@@ -177,9 +178,14 @@ class Visualizer(ControllableShowBase):
         self.step_num = (self.step_num - 1) % len(self.coords_3d)
         self._render(*args, **kwargs)
 
-    def visualize_with_steps(self, mode, step_num=0, *args, **kwargs):
+    def visualize_with_steps(self, mode, step_num=0, interval_step=3, *args, **kwargs):
         """
         Create simple animation of back projected 3D points without accounting for relative position change.
+        @param mode: visualization mode. One of Visualizer.SINGLE_STEP, Visualizer.MULTI_STEP, Visualizer.EVERYTHING.
+        Displays either one single time step, three frames seperated by `interval_step` frames or all frames
+        simultaneously (which is somewhat slow).
+        @param interval_step: Number of frames in between the three frames displayed in multi-step mode.
+        @param step_num: Number of the frame to display.
         """
         self.step_num = step_num
 
@@ -288,7 +294,7 @@ class Visualizer(ControllableShowBase):
                 sphere.reparentTo(frame_node)
 
                 if not self.use_relative_depths:
-                    sphere.setScale(self.base_sphere_scale)
+                    sphere.setScale(self.base_point_scale)
                 else:
                     sphere.setScale(scale[i, j])
                     # sphere.setScale(np.maximum(0.01, np.random.normal(0.03, 0.01)))

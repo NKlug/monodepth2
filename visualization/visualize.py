@@ -7,7 +7,9 @@ from visualization.visualizer import Visualizer as MatplotVisualizer
 from visualization.panda_visualizer import Visualizer as PandaVisualizer
 
 if __name__ == '__main__':
+    split = '2011_09_30_drive_0020'
     split = '2011_09_28_drive_0002'
+    split = '2011_09_26_drive_0001'
     split = None
     options = MonodepthOptions()
     opt = options.parse()
@@ -25,12 +27,8 @@ if __name__ == '__main__':
     with open(data_path, 'rb') as f:
         data = pickle.load(f)
 
-    # visualizer = MatplotVisualizer(data)
-    # visualizer.visualize_single_step(0)
-    # visualizer.simple_visualize_sequence()
-    # visualizer.visualize_with_steps()
-
-    app = PandaVisualizer(data, precompute_nodes=False, render_mode='scatter', global_coordinates=False)
-    app.visualize_with_steps(app.MULTI_STEP, step_num=1, interval_step=1, use_relative_depths=False)
+    app = PandaVisualizer(data, precompute_nodes=False, render_mode='scatter', color_mode='image', point_type='ball',
+                          global_coordinates=True, max_depth=1.5, use_relative_depths=False, downscale_factor=5)
+    app.visualize_with_steps(app.SINGLE_STEP, step_num=1, interval_step=5)
     # app.visualize_with_animation()
     app.run()
