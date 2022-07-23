@@ -10,7 +10,7 @@ if __name__ == '__main__':
     split = '2011_09_30_drive_0020'
     split = '2011_09_28_drive_0002'
     split = '2011_09_26_drive_0001'
-    split = None
+    split = None  # use split passed through cli options
     options = MonodepthOptions()
     opt = options.parse()
 
@@ -27,8 +27,12 @@ if __name__ == '__main__':
     with open(data_path, 'rb') as f:
         data = pickle.load(f)
 
+    # create visualizer with desired options
     app = PandaVisualizer(data, precompute_nodes=False, render_mode='scatter', color_mode='image', point_type='ball',
                           global_coordinates=True, max_depth=1.5, use_relative_depths=False, downscale_factor=5)
-    app.visualize_with_steps(app.SINGLE_STEP, step_num=1, interval_step=5)
+
+    # visualize with steps
+    app.visualize_with_steps(app.SINGLE_STEP, step_num=0, interval_step=5)
+
     # app.visualize_with_animation()
     app.run()

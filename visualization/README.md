@@ -3,7 +3,7 @@
 0. Train network or use pretrained weights.
 1. Create desired data split (i.e. a sequence from a single drive) or use an existing split from the `splits` directory
 (e.g. '2011_09_26_drive_0001').
-2. Run `predict_depth.py` locally or remotly with the desired split, i.e. 
+2. If no precomputed predictions are available, run `predict_depth.py` locally or remotly with the desired split, i.e. 
  ```
 python3 predict_depth.py
 --load_weights_folder
@@ -20,5 +20,5 @@ python3 predict_depth.py
 python3 visualize.py
 --load_weights_folder 
 models/mono_model/models/weights_19
- --split sequence
+ --split 2011_09_26_drive_0001
 ```

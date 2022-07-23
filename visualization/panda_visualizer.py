@@ -182,8 +182,8 @@ class Visualizer(ControllableShowBase):
         """
         Create simple animation of back projected 3D points without accounting for relative position change.
         @param mode: visualization mode. One of Visualizer.SINGLE_STEP, Visualizer.MULTI_STEP, Visualizer.EVERYTHING.
-        Displays either one single time step, three frames seperated by `interval_step` frames or all frames
-        simultaneously (which is somewhat slow).
+        Displays either one single time step, three frames seperated by `interval_step` frames (with different opacities)
+        or all frames simultaneously (which is somewhat slow).
         @param interval_step: Number of frames in between the three frames displayed in multi-step mode.
         @param step_num: Number of the frame to display.
         """
