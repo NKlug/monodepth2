@@ -3,29 +3,19 @@ import matplotlib as mpl
 import matplotlib.cm as cm
 import numpy as np
 import tqdm
+from direct.gui.OnscreenImage import OnscreenImage
 from direct.task import Task
 from panda3d.core import *
 
 from visualization.compute_3d_coordinates import compute_3d_coordinates
 from visualization.controllable_show_base import ControllableShowBase
 
-SIZE = 800
-FORWARD = 'forward'
-BACKWARD = 'backward'
-LEFT = 'left'
-RIGHT = 'right'
-UP = 'up'
-DOWN = 'down'
-
-ON = 1
-OFF = 0
-
 
 class Visualizer(ControllableShowBase):
 
     def __init__(self, data, precompute_nodes=True, render_mode='scatter', color_mode='depth', point_type='cube',
                  global_coordinates=True, downscale_factor=6, base_point_scale=0.005,
-                 max_depth=1.5, use_relative_depths=False):
+                 max_depth=1.5, use_relative_depths=False, show_2d_image=True):
         """
         Creates the Panda3D Visualizer.
         @param data: data dictionary
@@ -40,6 +30,7 @@ class Visualizer(ControllableShowBase):
         @param max_depth: Points with a relative depth greater than max_depth are not displayed.
         @param use_relative_depths: Whether to scale points relative to their depth.
         @param base_point_scale: Base size of a point.
+        @param show_2d_image: Whether to show the 2d image from which the current 3d points originate.
         """
         ControllableShowBase.__init__(self)
 
@@ -59,11 +50,13 @@ class Visualizer(ControllableShowBase):
         self.global_coordinates = global_coordinates
         self.max_depth = max_depth
         self.use_relative_depths = use_relative_depths
+        self.show_2d_image = show_2d_image
 
         axes_node = self.create_axes_and_grid(length=20)
         axes_node.reparentTo(self.root)
 
         self.depth_node = None
+        self.onscreenimage = None
         self.render_fn = None
 
         print('-> Preparing data')
@@ -89,6 +82,11 @@ class Visualizer(ControllableShowBase):
                 [self.compute_image_coloring(image=img, downscale=self.downscale) for img in self.data['color']])
         else:
             raise Exception(f"Unknown coloring mode {color_mode}!")
+
+        c, h, w = data['color'][0].shape
+        self.dummy_image = np.zeros((h*2, w*2, c), dtype=np.uint8)
+        self.texture_onscreenimage = Texture()
+        self.texture_onscreenimage.setup2dTexture(w*2, h*2, Texture.T_unsigned_byte, Texture.F_rgb)
 
         self.nodes = [None] * len(self.coords_3d)
         self.render_single_fn = None
@@ -257,8 +255,29 @@ class Visualizer(ControllableShowBase):
                                                               **kwargs)
         frame_node.reparentTo(self.depth_node)
 
+        if self.show_2d_image:
+            self._show_2d_image()
+
         self.nodes[self.step_num] = self.depth_node
         return self.depth_node
+
+    def _show_2d_image(self):
+        if self.onscreenimage is not None:
+            self.onscreenimage.removeNode()
+        image = (self.data['color'][self.step_num].T * 255).astype(np.uint8)
+        image = image[..., [2, 1, 0]]
+        image = np.swapaxes(image, 0, 1)
+        image = image[::-1, ...]
+        h, w = image.shape[:2]
+        self.dummy_image[h:, w:] = image
+
+        self.texture_onscreenimage.setRamImage(self.dummy_image.tostring())
+        s = 1
+
+        self.onscreenimage = OnscreenImage(image=self.texture_onscreenimage)
+        self.onscreenimage.setScale((s, 1., h / w * s))
+        self.onscreenimage.setPos((0, 0, 0))
+        self.onscreenimage.reparentTo(self.a2dBottomLeft)
 
     def _render_frame_as_mesh(self, alpha, colors, coords_3d, *args, **kwargs):
         w, h = coords_3d.shape[:2]

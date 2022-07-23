@@ -7,7 +7,6 @@ from direct.showbase.Loader import Loader
 from panda3d.core import *
 import numpy as np
 
-SIZE = 1500
 FORWARD = 'forward'
 BACKWARD = 'backward'
 LEFT = 'left'
@@ -93,6 +92,7 @@ class ControllableShowBase(ShowBase):
         self.winList[0].requestProperties(wp)
         self.camera.setPos(*self.camera_position)
         self.camera.setHpr(self.yaw, self.pitch, 0)
+        self.camLens.setNear(0.2)
         # mk = self.dataRoot.attachNewNode(MouseAndKeyboard(self.winList[0], 0, 'w2mouse'))
         # mk.attachNewNode(ButtonThrower('w2mouse'))
 
