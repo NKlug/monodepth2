@@ -20,8 +20,7 @@ splits_dir = os.path.join(os.path.dirname(__file__), "splits")
 def predict_depth(opt):
     """
     Predict depth maps for given input images.
-    :param data:
-    :param opt:
+    @param opt: Options dict
     """
 
     opt.load_weights_folder = os.path.expanduser(opt.load_weights_folder)

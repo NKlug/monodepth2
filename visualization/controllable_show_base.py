@@ -171,8 +171,8 @@ class ControllableShowBase(ShowBase):
     def auto_rotate(self, task):
         """
         Lets the camera rotate around the pose with speed self.rotation_speed
-        :param task:
-        :return:
+        @param task:
+        @return:
         """
         time = task.time
         angle = time / self.fps * self.rotation_speed % 360

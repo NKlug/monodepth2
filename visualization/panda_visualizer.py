@@ -117,8 +117,8 @@ class Visualizer(ControllableShowBase):
     def visualize_with_animation(self, delay=200, step_num=0, *args, **kwargs):
         """
         Animates the 3d depth maps with automated camera movement.
-        :param delay: delay between two frames in milliseconds
-        :param step_num: starting step
+        @param delay: delay between two frames in milliseconds
+        @param step_num: starting step
         """
         self.step_num = step_num
 
