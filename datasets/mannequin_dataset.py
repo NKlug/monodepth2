@@ -1,0 +1,93 @@
+import os
+import numpy as np
+from datasets.mono_dataset import MonoDataset
+import PIL.Image as pil
+
+import cv2
+
+
+def mp4_loader(path, frame_id):
+    """
+    MP4 loader.
+    @param frame_id: frame id
+    @param path: Path of the mp4 file
+    @return:
+    """
+    vidcap = cv2.VideoCapture(path)
+    vidcap.set(cv2.CAP_PROP_FRAME_COUNT, frame_id)
+    success, image = vidcap.read()
+    if not success:
+        raise Exception(f'Could not read frame {frame_id} from {path}!')
+    return image
+
+
+class MannequinDataset(MonoDataset):
+    """Superclass for different types of MannequinDataset loaders
+    """
+
+    def __init__(self, *args, **kwargs):
+        super(MannequinDataset, self).__init__(*args, **kwargs)
+
+        self.loader = mp4_loader
+
+        # NOTE: Make sure your intrinsics matrix is *normalized* by the original image size.
+        # To normalize you need to scale the first row by 1 / image_width and the second row
+        # by 1 / image_height. Monodepth2 assumes a principal point to be exactly centered.
+        # If your principal point is far from the center you might need to disable the horizontal
+        # flip augmentation.
+        # self.K = np.array([[0.58, 0, 0.5, 0],
+        #                    [0, 1.92, 0.5, 0],
+        #                    [0, 0, 1, 0],
+        #                    [0, 0, 0, 1]], dtype=np.float32)
+
+        self.K = self.get_camera_intrinsics()
+
+    def get_camera_intrinsics(self):
+        raise NotImplementedError()
+
+    def get_color(self, video_path, frame_index, side, do_flip):
+        color = self.loader(video_path, frame_index)
+
+        if do_flip:
+            color = color.transpose(pil.FLIP_LEFT_RIGHT)
+
+        return color
+
+
+class SingleVideoMannequinDataset(MannequinDataset):
+    """Class for a single video of the MannequinDataset, i.e. all frames in the dataset stem from the same video.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super(SingleVideoMannequinDataset, self).__init__(*args, **kwargs)
+
+        self.K = self.get_camera_intrinsics()
+
+    def get_camera_intrinsics(self):
+        # all filenames are the same, as the dataset consists of only frames from one video.
+        intrinsics_file_name = os.path.basename(self.filenames[0]).replace('.mp4', '.txt')
+
+        # we assume the intrinsics stay the same throughout the video. Hence we use the intrinsics from the first frame
+        with open(intrinsics_file_name, 'r') as intrinsics_file:
+            _ = intrinsics_file.readline() # skip first line (video url)
+            line = intrinsics_file.readline()
+            intrinsics = line.split()[1:7]
+
+        # for the meaning of the values see https://google.github.io/mannequinchallenge/www/download.html
+        K = np.zeros((4, 4), dtype=np.float32)
+        K[0, 0] = intrinsics[0]
+        K[1, 1] = intrinsics[1]
+        K[0, 2] = intrinsics[2]
+        K[1, 2] = intrinsics[3]
+        K[2, 2] = 1
+        K[3, 3] = 1
+
+        return K
+
+    def get_color(self, video_path, frame_index, side, do_flip):
+        color = self.loader(video_path, frame_index)
+
+        if do_flip:
+            color = color.transpose(pil.FLIP_LEFT_RIGHT)
+
+        return color
