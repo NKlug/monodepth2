@@ -38,7 +38,7 @@ def generate_video_split_mannequin(split_filename, video_name, folder,  opt, all
 
     with open(split_filename, 'w') as split_file:
         for frame_number in frame_numbers:
-            split_file.write(f'{video_name} {frame_number} 0\n')
+            split_file.write(f'{os.path.join(folder, video_name)} {frame_number} 0\n')
 
 
 if __name__ == '__main__':
