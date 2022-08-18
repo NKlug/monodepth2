@@ -4,16 +4,18 @@ import numpy as np
 import cv2
 
 if __name__ == '__main__':
-    calib_dir = '/home/nikolas/Datasets/kitti_data/'
-    oxts_filename = '0000000000.txt'
-    velo_filename = '0000000000.bin'
+    data_dir = '/home/nikolas/Datasets/MannequinChallenge/MannequinChallenge/'
 
-    velo_filename = os.path.join(calib_dir, '2011_09_26_drive_0001_sync/velodyne_points/data', velo_filename)
-    depth_map = generate_depth_map(calib_dir, velo_filename)
-    # depth_map = depth_map / np.max(depth_map) * 255
-    #
-    # cv2.imshow('asdf', depth_map.astype(np.uint8))
-    # cv2.waitKey(0)
+    mp4_path = os.path.join(data_dir, 'validation', '00c9878266685887.mp4')
+    out_folder = os.path.join(data_dir, 'tmp')
 
-    get_absolute_camera_orientation(calib_dir, None)
-    pass
+    vidcap = cv2.VideoCapture(mp4_path)
+    success, image = vidcap.read()
+    count = 0
+    print(vidcap.get(cv2.CAP_PROP_FPS))
+    while success:
+        # image_file_path = os.path.join(out_folder, 'img_{:0>6d}.jpg'.format(count))
+        count += 1
+        # cv2.imwrite(image_file_path, image)
+        success, image = vidcap.read()
+    print(f"total number of frames: {count}")
