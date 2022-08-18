@@ -3,6 +3,7 @@ import numpy as np
 from datasets.mono_dataset import MonoDataset
 import PIL.Image as pil
 
+import imageio
 import cv2
 
 
@@ -13,12 +14,13 @@ def mp4_loader(path, frame_id):
     @param path: Path of the mp4 file
     @return:
     """
-    vidcap = cv2.VideoCapture(path)
-    vidcap.set(cv2.CAP_PROP_FRAME_COUNT, frame_id)
-    success, image = vidcap.read()
-    if not success:
+    if not os.path.exists(path):
+        raise Exception(f'Video file at {path} does not exist!')
+    video = imageio.get_reader(path, 'ffmpeg')
+    image = video.get_data(frame_id)
+    if image is None:
         raise Exception(f'Could not read frame {frame_id} from {path}!')
-    return image
+    return pil.fromarray(image)
 
 
 class MannequinDataset(MonoDataset):
@@ -42,16 +44,14 @@ class MannequinDataset(MonoDataset):
 
         self.K = self.get_camera_intrinsics()
 
+    def check_depth(self):
+        return False
+
+    def check_oxts(self):
+        return False
+
     def get_camera_intrinsics(self):
         raise NotImplementedError()
-
-    def get_color(self, video_path, frame_index, side, do_flip):
-        color = self.loader(video_path, frame_index)
-
-        if do_flip:
-            color = color.transpose(pil.FLIP_LEFT_RIGHT)
-
-        return color
 
 
 class SingleVideoMannequinDataset(MannequinDataset):
@@ -65,11 +65,12 @@ class SingleVideoMannequinDataset(MannequinDataset):
 
     def get_camera_intrinsics(self):
         # all filenames are the same, as the dataset consists of only frames from one video.
-        intrinsics_file_name = os.path.basename(self.filenames[0]).replace('.mp4', '.txt')
+        intrinsics_file_name = self.filenames[0].split()[0] + '.txt'
+        intrinsics_file_name = os.path.join(self.data_path, intrinsics_file_name)
 
         # we assume the intrinsics stay the same throughout the video. Hence we use the intrinsics from the first frame
         with open(intrinsics_file_name, 'r') as intrinsics_file:
-            _ = intrinsics_file.readline() # skip first line (video url)
+            _ = intrinsics_file.readline()  # skip first line (video url)
             line = intrinsics_file.readline()
             intrinsics = line.split()[1:7]
 
@@ -84,10 +85,20 @@ class SingleVideoMannequinDataset(MannequinDataset):
 
         return K
 
-    def get_color(self, video_path, frame_index, side, do_flip):
-        color = self.loader(video_path, frame_index)
+    def get_color(self, video_name, frame_index, side, do_flip):
+        video_path = os.path.join(self.data_path, video_name + '.mp4')
+        color_image = self.loader(video_path, frame_index)
+
+        # resize with padding to given width and height
+        resized_image = pil.new(color_image.mode, (self.width, self.height), (0, 0, 0))
+
+        # resize while keeping the aspect ratio
+        color_image.thumbnail((self.width, self.height), pil.BILINEAR)
+        resized_image.paste(color_image, (
+            (resized_image.width - color_image.width // 2), (resized_image.height - color_image.height) // 2))
+        color_image = resized_image
 
         if do_flip:
-            color = color.transpose(pil.FLIP_LEFT_RIGHT)
+            color_image = color_image.transpose(pil.FLIP_LEFT_RIGHT)
 
-        return color
+        return color_image
