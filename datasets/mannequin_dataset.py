@@ -95,7 +95,7 @@ class SingleVideoMannequinDataset(MannequinDataset):
         # resize while keeping the aspect ratio
         color_image.thumbnail((self.width, self.height), pil.BILINEAR)
         resized_image.paste(color_image, (
-            (resized_image.width - color_image.width // 2), (resized_image.height - color_image.height) // 2))
+            ((resized_image.width - color_image.width) // 2), (resized_image.height - color_image.height) // 2))
         color_image = resized_image
 
         if do_flip:
