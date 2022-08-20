@@ -9,6 +9,11 @@ from utils import lat_lon_to_meters
 
 
 def get_global_coords(data):
+    if 'oxts' not in data:
+        print('-> No oxts data found!')
+        z = np.zeros(data['depth'].shape[0])
+        return z, z, z, z, z, z
+
     lat = data['oxts']['lat']
     lon = data['oxts']['lon']
     alt = data['oxts']['alt']
@@ -25,7 +30,7 @@ def get_global_coords(data):
     return lat, lon, alt, roll, pitch, yaw
 
 
-def compute_3d_coordinates(data, downscale=1, global_coordinates=False, max_depth=None):
+def compute_3d_coordinates(data, downsample=1, global_coordinates=False, max_depth=None):
     """
     Compute 3d coordinates from predicted depth and camera intrinsics in meters.
     """
@@ -39,11 +44,15 @@ def compute_3d_coordinates(data, downscale=1, global_coordinates=False, max_dept
         orientation = np.stack([roll, pitch, yaw], axis=-1)
         # downscale lat and lon such that to ground truth and predicted median depths match
         # see evaluate_depth.py lines 205 ff.
-        gt_median = np.mean(data["gt_medians"])
-        pred_median = np.mean(data["pred_medians"])
-        scale_factor = gt_median / pred_median
+        if 'gt_medians' in data and 'pred_medians' in data:
+            gt_median = np.mean(data["gt_medians"])
+            pred_median = np.mean(data["pred_medians"])
+            scale_factor = gt_median / pred_median
+        else:
+            # use hard coded scale factor
+            scale_factor = 30
+
         print(f'-> Scaling predictions with factor {scale_factor}')
-        # scale_factor = 30.555
         position[:, :2] *= 1/scale_factor
     else:
         position = np.zeros((len(predicted_depths), 3))
@@ -58,7 +67,7 @@ def compute_3d_coordinates(data, downscale=1, global_coordinates=False, max_dept
             predicted_depth = np.minimum(predicted_depth, max_depth)
 
         inv_K = data['inv_K'][i]
-        coords_3d = back_project_fn(predicted_depth, downscale=downscale, inv_K=inv_K)
+        coords_3d = back_project_fn(predicted_depth, downsample=downsample, inv_K=inv_K)
         coords_3d = image_to_imu_coordinates(coords_3d)
 
         if global_coordinates:
@@ -86,12 +95,12 @@ def compute_3d_coordinates(data, downscale=1, global_coordinates=False, max_dept
     return np.asarray(coords), position, orientation
 
 
-def back_project_orthographic(predicted_depth, f=5, downscale=4, *args, **kwargs):
+def back_project_orthographic(predicted_depth, f=5, downsample=4, *args, **kwargs):
     """
     Back project predicted depths to 3D space.
     """
     h, w = predicted_depth.shape[:2]
-    predicted_depth = cv2.resize(predicted_depth, (w // downscale, h // downscale), interpolation=cv2.INTER_LINEAR)
+    predicted_depth = cv2.resize(predicted_depth, (w // downsample, h // downsample), interpolation=cv2.INTER_LINEAR)
     h, w = predicted_depth.shape[:2]
 
     aspect_ratio = h / w
@@ -115,7 +124,7 @@ def back_project_orthographic(predicted_depth, f=5, downscale=4, *args, **kwargs
     return coordinates_3d
 
 
-def back_project_perspective(predicted_depth, inv_K, downscale=4, *args, **kwargs):
+def back_project_perspective(predicted_depth, inv_K, downsample=4, *args, **kwargs):
     """
     Compute 3d coordinates by perspective re-projection using the 2d coordinates and estimated depths.
     """
@@ -134,7 +143,7 @@ def back_project_perspective(predicted_depth, inv_K, downscale=4, *args, **kwarg
         cam_points = cam_points[:, :3, ...]
 
     cam_points = cam_points[0].T
-    cam_points = cv2.resize(cam_points, (h // downscale, w // downscale), interpolation=cv2.INTER_LINEAR)
+    cam_points = cv2.resize(cam_points, (h // downsample, w // downsample), interpolation=cv2.INTER_LINEAR)
 
     return cam_points
 

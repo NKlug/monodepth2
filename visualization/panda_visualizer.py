@@ -14,8 +14,8 @@ from visualization.controllable_show_base import ControllableShowBase
 class Visualizer(ControllableShowBase):
 
     def __init__(self, data, precompute_nodes=True, render_mode='scatter', color_mode='depth', point_type='cube',
-                 global_coordinates=True, downscale_factor=6, base_point_scale=0.005,
-                 max_depth=1.5, use_relative_depths=False, show_2d_image=True):
+                 global_coordinates=True, downsample_factor=6, base_point_scale=0.005,
+                 max_depth=1.5, use_relative_depths=False, show_2d_image=True, coords_upscale=1):
         """
         Creates the Panda3D Visualizer.
         @param data: data dictionary
@@ -26,7 +26,7 @@ class Visualizer(ControllableShowBase):
         the colors form the images.
         @param point_type: 'cube' or 'ball'. Whether to use a cube or a ball to represent a point in space
         @param global_coordinates: Whether to view the points in the global coordinate system.
-        @param downscale_factor: Factor of how much to downscale the images.
+        @param downsample_factor: Factor of how much to downsample the images.
         @param max_depth: Points with a relative depth greater than max_depth are not displayed.
         @param use_relative_depths: Whether to scale points relative to their depth.
         @param base_point_scale: Base size of a point.
@@ -62,9 +62,9 @@ class Visualizer(ControllableShowBase):
         print('-> Preparing data')
 
         self.step_num = 0
-        self.downscale = downscale_factor
+        self.downsample = downsample_factor
         self.predicted_depths = self.data['depth']
-        self.coords_3d, self.position, self.orientation = compute_3d_coordinates(self.data, downscale=self.downscale,
+        self.coords_3d, self.position, self.orientation = compute_3d_coordinates(self.data, downsample=self.downsample,
                                                                                  global_coordinates=self.global_coordinates)
 
         if point_type == 'cube':
@@ -76,10 +76,10 @@ class Visualizer(ControllableShowBase):
 
         if color_mode == 'depth':
             self.colors = np.asarray(
-                [self.compute_depth_coloring(depths=d, downscale=self.downscale) for d in self.predicted_depths])
+                [self.compute_depth_coloring(depths=d, downsample=self.downsample) for d in self.predicted_depths])
         elif color_mode == 'image':
             self.colors = np.asarray(
-                [self.compute_image_coloring(image=img, downscale=self.downscale) for img in self.data['color']])
+                [self.compute_image_coloring(image=img, downsample=self.downsample) for img in self.data['color']])
         else:
             raise Exception(f"Unknown coloring mode {color_mode}!")
 
@@ -97,9 +97,9 @@ class Visualizer(ControllableShowBase):
         else:
             self.render_single_fn = self._render_single_depth_map
 
-    def compute_depth_coloring(self, depths, downscale=1, *args, **kwargs):
+    def compute_depth_coloring(self, depths, downsample=1, *args, **kwargs):
         h, w = depths.shape[:2]
-        depths = cv2.resize(depths, (w // downscale, h // downscale))
+        depths = cv2.resize(depths, (w // downsample, h // downsample))
 
         vmax = np.percentile(depths, 95)
         normalizer = mpl.colors.Normalize(vmin=depths.min(), vmax=vmax)
@@ -107,10 +107,10 @@ class Visualizer(ControllableShowBase):
         colors = mapper.to_rgba(depths)[:, :, :3]
         return np.swapaxes(colors, 0, 1)
 
-    def compute_image_coloring(self, image, downscale=1, *args, **kwargs):
+    def compute_image_coloring(self, image, downsample=1, *args, **kwargs):
         image = image.T
         h, w = image.shape[:2]
-        return cv2.resize(image, (w // downscale, h // downscale))
+        return cv2.resize(image, (w // downsample, h // downsample))
 
     def visualize_with_animation(self, delay=200, step_num=0, *args, **kwargs):
         """

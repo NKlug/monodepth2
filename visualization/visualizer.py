@@ -56,11 +56,11 @@ class Visualizer:
         Visualizes data in single steps.
         Press <space> for forward, < - > for backward.
         """
-        downscale = 8
+        downsample = 8
 
         # compute and extract some data
         predicted_depths = self.data['depth']
-        coords = compute_3d_coordinates(self.data, downscale=downscale, global_coordinates=True)
+        coords = compute_3d_coordinates(self.data, downsample=downsample, global_coordinates=True)
         lat, lon, alt, roll, pitch, yaw = get_global_coords(self.data)
 
         def on_press(event):
@@ -96,7 +96,7 @@ class Visualizer:
             # compute colors
             color_depths = predicted_depths[i]
             h, w = color_depths.shape[:2]
-            color_depths = cv2.resize(color_depths, (w // downscale, h // downscale))
+            color_depths = cv2.resize(color_depths, (w // downsample, h // downsample))
             colors = self.compute_coloring(color_depths)
             colors = np.swapaxes(colors, 0, 1)
 
@@ -115,9 +115,9 @@ class Visualizer:
         """
         Create simple animation of back projected 3D points without accounting for relative position change.
         """
-        downscale = 8
+        downsample = 8
         predicted_depths = self.data['depth']
-        coords = compute_3d_coordinates(self.data, downscale=downscale, max_depth=3, global_coordinates=True)
+        coords = compute_3d_coordinates(self.data, downsample=downsample, max_depth=3, global_coordinates=True)
 
         def next_scatter(num, coords):
             xv = coords[num, :, :, 0]
@@ -127,7 +127,7 @@ class Visualizer:
             # compute colors
             color_depths = predicted_depths[num]
             h, w = color_depths.shape[:2]
-            color_depths = cv2.resize(color_depths, (w // downscale, h // downscale))
+            color_depths = cv2.resize(color_depths, (w // downsample, h // downsample))
             colors = self.compute_coloring(color_depths)
             colors = np.swapaxes(colors, 0, 1)
 
@@ -166,10 +166,10 @@ class Visualizer:
         """
         Create simple animation of back projected 3D points without accounting for relative position change.
         """
-        downscale = 8
+        downsample = 8
         predicted_depths = self.data['depth']
-        # coords = compute_3d_coordinates(self.data, downscale=downscale, global_coordinates=False)
-        coords = compute_3d_coordinates(self.data, downscale=downscale, global_coordinates=True)
+        # coords = compute_3d_coordinates(self.data, downsample=downsample, global_coordinates=False)
+        coords = compute_3d_coordinates(self.data, downsample=downsample, global_coordinates=True)
 
         xv = coords[step_num, :, :, 0]
         yv = coords[step_num, :, :, 1]
@@ -178,7 +178,7 @@ class Visualizer:
         # compute colors
         color_depths = predicted_depths[step_num]
         h, w = color_depths.shape[:2]
-        color_depths = cv2.resize(color_depths, (w // downscale, h // downscale))
+        color_depths = cv2.resize(color_depths, (w // downsample, h // downsample))
         colors = self.compute_coloring(color_depths)
         colors = np.swapaxes(colors, 0, 1)
 
