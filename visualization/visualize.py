@@ -32,8 +32,8 @@ if __name__ == '__main__':
 
     # create visualizer with desired options
     app = PandaVisualizer(data, precompute_nodes=False, render_mode='scatter', color_mode='image', point_type='cube',
-                          global_coordinates=True, max_depth=1.5, use_relative_depths=False, downsample_factor=5,
-                          show_2d_image=True)
+                          global_coordinates=False, max_depth=1.5, use_relative_depths=False, downsample_factor=5,
+                          show_2d_image=True, coords_upscale=4)
 
     print(f'-> Using GPU: {app.win.gsg.driver_renderer}')
 
