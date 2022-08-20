@@ -50,12 +50,51 @@ class MannequinDataset(MonoDataset):
     def check_oxts(self):
         return False
 
+    def get_color(self, video_name, frame_index, side, do_flip):
+        video_path = os.path.join(self.data_path, video_name + '.mp4')
+        color_image = self.loader(video_path, frame_index)
+
+        # resize with padding to given width and height
+        resized_image = pil.new(color_image.mode, (self.width, self.height), (0, 0, 0))
+
+        # resize while keeping the aspect ratio
+        color_image.thumbnail((self.width, self.height), pil.BILINEAR)
+        resized_image.paste(color_image, (
+            ((resized_image.width - color_image.width) // 2), (resized_image.height - color_image.height) // 2))
+        color_image = resized_image
+
+        if do_flip:
+            color_image = color_image.transpose(pil.FLIP_LEFT_RIGHT)
+
+        return color_image
+
     def get_camera_intrinsics(self):
         raise NotImplementedError()
 
 
+class MultiVideoMannequinDataset(MannequinDataset):
+    """General dataset class for the the MannequinDataset.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super(MultiVideoMannequinDataset, self).__init__(*args, **kwargs)
+
+        # We use the average intrinsics of each video
+
+        # NOTE: Make sure your intrinsics matrix is *normalized* by the original image size.
+        # To normalize you need to scale the first row by 1 / image_width and the second row
+        # by 1 / image_height. Monodepth2 assumes a principal point to be exactly centered.
+        # If your principal point is far from the center you might need to disable the horizontal
+        # flip augmentation.
+        self.K = np.array([[0.88, 0, 0.5, 0],
+                           [0, 1.58, 0.5, 0],
+                           [0, 0, 1, 0],
+                           [0, 0, 0, 1]], dtype=np.float32)
+
+
 class SingleVideoMannequinDataset(MannequinDataset):
     """Class for a single video of the MannequinDataset, i.e. all frames in the dataset stem from the same video.
+    Uses the respective camera intrinsics
     """
 
     def __init__(self, *args, **kwargs):
@@ -84,21 +123,3 @@ class SingleVideoMannequinDataset(MannequinDataset):
         K[3, 3] = 1
 
         return K
-
-    def get_color(self, video_name, frame_index, side, do_flip):
-        video_path = os.path.join(self.data_path, video_name + '.mp4')
-        color_image = self.loader(video_path, frame_index)
-
-        # resize with padding to given width and height
-        resized_image = pil.new(color_image.mode, (self.width, self.height), (0, 0, 0))
-
-        # resize while keeping the aspect ratio
-        color_image.thumbnail((self.width, self.height), pil.BILINEAR)
-        resized_image.paste(color_image, (
-            ((resized_image.width - color_image.width) // 2), (resized_image.height - color_image.height) // 2))
-        color_image = resized_image
-
-        if do_flip:
-            color_image = color_image.transpose(pil.FLIP_LEFT_RIGHT)
-
-        return color_image
