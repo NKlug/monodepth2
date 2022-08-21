@@ -42,31 +42,13 @@ class MannequinDataset(MonoDataset):
         #                    [0, 0, 1, 0],
         #                    [0, 0, 0, 1]], dtype=np.float32)
 
-        self.K = self.get_camera_intrinsics()
+        self.K = None
 
     def check_depth(self):
         return False
 
     def check_oxts(self):
         return False
-
-    def get_color(self, video_name, frame_index, side, do_flip):
-        video_path = os.path.join(self.data_path, video_name + '.mp4')
-        color_image = self.loader(video_path, frame_index)
-
-        # resize with padding to given width and height
-        resized_image = pil.new(color_image.mode, (self.width, self.height), (0, 0, 0))
-
-        # resize while keeping the aspect ratio
-        color_image.thumbnail((self.width, self.height), pil.BILINEAR)
-        resized_image.paste(color_image, (
-            ((resized_image.width - color_image.width) // 2), (resized_image.height - color_image.height) // 2))
-        color_image = resized_image
-
-        if do_flip:
-            color_image = color_image.transpose(pil.FLIP_LEFT_RIGHT)
-
-        return color_image
 
     def get_camera_intrinsics(self):
         raise NotImplementedError()
@@ -90,6 +72,18 @@ class MultiVideoMannequinDataset(MannequinDataset):
                            [0, 1.58, 0.5, 0],
                            [0, 0, 1, 0],
                            [0, 0, 0, 1]], dtype=np.float32)
+
+    def get_color(self, video_name, frame_index, side, do_flip):
+        video_path = os.path.join(self.data_path, video_name + '.mp4')
+        color_image = self.loader(video_path, frame_index)
+
+        # resize without keeping the aspect ratio
+        color_image.resize((self.width, self.height))
+
+        if do_flip:
+            color_image = color_image.transpose(pil.FLIP_LEFT_RIGHT)
+
+        return color_image
 
 
 class SingleVideoMannequinDataset(MannequinDataset):
@@ -123,3 +117,21 @@ class SingleVideoMannequinDataset(MannequinDataset):
         K[3, 3] = 1
 
         return K
+
+    def get_color(self, video_name, frame_index, side, do_flip):
+        video_path = os.path.join(self.data_path, video_name + '.mp4')
+        color_image = self.loader(video_path, frame_index)
+
+        # resize with padding to given width and height
+        resized_image = pil.new(color_image.mode, (self.width, self.height), (0, 0, 0))
+
+        # resize while keeping the aspect ratio
+        color_image.thumbnail((self.width, self.height), pil.BILINEAR)
+        resized_image.paste(color_image, (
+            ((resized_image.width - color_image.width) // 2), (resized_image.height - color_image.height) // 2))
+        color_image = resized_image
+
+        if do_flip:
+            color_image = color_image.transpose(pil.FLIP_LEFT_RIGHT)
+
+        return color_image
