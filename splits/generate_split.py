@@ -99,10 +99,10 @@ if __name__ == '__main__':
     # generate_video_split_mannequin(split_filename, video_name, folder, options)
 
     # code for mannequin train
-    folder = 'train'
+    folder = 'validation'
     split_filename = 'mannequin_train'
 
-    split_filename = os.path.join(split_filename, 'train_files.txt')
+    split_filename = os.path.join(split_filename, 'val_files.txt')
     print(f'Generating split {split_filename}')
     generate_training_split_mannequin(split_filename, folder, options)
 
