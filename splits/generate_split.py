@@ -101,7 +101,7 @@ if __name__ == '__main__':
 
     # code for mannequin single video
     # folder = 'validation'
-    # split_filename = '00c9878266685887'
+    # split_filename = 'ebdf4f0a220e58e6'
     # video_name = split_filename
     # split_filename = f'Mannequin_{split_filename}'
     #
@@ -118,11 +118,11 @@ if __name__ == '__main__':
     # generate_training_split_mannequin(split_filename, folder, options)
 
     # code for custom split generation
-    video_path = 'validation/00c9878266685887'
-    split_filename = 'Mannequin_00c9878266685887_custom'
+    video_path = 'validation/ebdf4f0a220e58e6'
+    split_filename = 'Mannequin_ebdf4f0a220e58e6_custom'
     split_filename = os.path.join(split_filename, 'test_files.txt')
 
-    generate_custom_mannequin_split(split_filename, video_path, 3600, 4200, 6)
+    generate_custom_mannequin_split(split_filename, video_path, 590, 1190, 6)
 
     # folder = '2011_09_26/2011_09_26_drive_0001_sync'
     # split_filename = 'sequence/test_files.txt'
