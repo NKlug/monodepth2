@@ -38,3 +38,31 @@ def prepare_scatter_node(float alpha,
             sphere.setColor(*colors_view[i, j], alpha)
 
     return frame_node
+
+
+def prepare_mesh_node(float alpha,
+                    float [:, :, :] colors,
+                    double[:, :, :] coords_3d,
+                    *args, **kwargs):
+    cdef Py_ssize_t w = coords_3d.shape[0]
+    cdef Py_ssize_t h = coords_3d.shape[1]
+    ls = LineSegs()
+    ls.setThickness(2)
+
+    cdef double [:, :, :] coords_3d_view = coords_3d
+    cdef float [:, :, :] colors_view = colors
+
+    cdef unsigned int i, j
+    for i in range(w):
+        for j in range(h):
+            ls.setColor(*colors_view[i, j], alpha)
+
+            if i < w - 1:
+                ls.move_to(*coords_3d_view[i, j])
+                ls.draw_to(*coords_3d_view[i + 1, j])
+
+            if j < h - 1:
+                ls.move_to(*coords_3d_view[i, j])
+                ls.draw_to(*coords_3d_view[i, j + 1])
+
+    return NodePath(ls.create())

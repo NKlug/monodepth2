@@ -9,7 +9,7 @@ from panda3d.core import *
 
 from visualization.compute_3d_coordinates import compute_3d_coordinates
 from visualization.controllable_show_base import ControllableShowBase
-from visualization.prepare_node import prepare_scatter_node
+from visualization.prepare_node import prepare_scatter_node, prepare_mesh_node
 
 
 class Visualizer(ControllableShowBase):
@@ -284,7 +284,7 @@ class Visualizer(ControllableShowBase):
         self.onscreenimage.setPos((0, 0, 0))
         self.onscreenimage.reparentTo(self.a2dBottomLeft)
 
-    def _render_frame_as_mesh(self, alpha, colors, coords_3d, *args, **kwargs):
+    def _render_frame_as_mesh1(self, alpha, colors, coords_3d, *args, **kwargs):
         w, h = coords_3d.shape[:2]
         ls = LineSegs()
         ls.setThickness(2)
@@ -302,6 +302,9 @@ class Visualizer(ControllableShowBase):
                     ls.draw_to(*coords_3d[i, j + 1])
 
         return NodePath(ls.create())
+
+    def _render_frame_as_mesh(self, alpha, colors, coords_3d, *args, **kwargs):
+        return prepare_mesh_node(alpha, colors, coords_3d, *args, **kwargs)
 
     def _render_frame_as_scatter(self, alpha, colors, coords_3d, scale, relative_depths,
                                 *args, **kwargs):
