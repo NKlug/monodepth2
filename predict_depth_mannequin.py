@@ -57,8 +57,9 @@ def predict_depth_mannequin(opt):
     inv_Ks = []
     color_images = []
 
+    width, height = encoder_dict['width'], encoder_dict['height']
     print("-> Computing predictions with size {}x{}".format(
-        encoder_dict['width'], encoder_dict['height']))
+        width, height))
 
     with torch.no_grad():
         for data in dataloader:
@@ -83,6 +84,25 @@ def predict_depth_mannequin(opt):
     pred_depths = np.concatenate(pred_depths)
     inv_Ks = np.concatenate(inv_Ks)
     color_images = np.concatenate(color_images)
+
+    # clip images and depths to get rid of black bars if they do not have the correct aspect ratio
+    # correct aspect ratio is 16/9
+    if not np.isclose(width / height, 16 / 9):
+        if width > 16 / 9 * height:  # image too wide
+            correct_width = round(16 / 9 * height)
+            start = (width - correct_width) // 2
+            stop = width - start
+            pred_disps = pred_disps[:, :, start:stop, ...]
+            pred_depths = pred_depths[:, :, start:stop, ...]
+            color_images = color_images[:, :, :, start:stop, ...]
+
+        else:  # image too high
+            correct_height = round(9 / 16 * width)
+            start = (height - correct_height) // 2
+            stop = height - start
+            pred_disps = pred_disps[:, start:stop, ...]
+            pred_depths = pred_depths[:, start:stop, ...]
+            color_images = color_images[:, :, start:stop, ...]
 
     outputs = {
         "depth": pred_depths,
