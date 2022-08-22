@@ -38,6 +38,8 @@ class ControllableShowBase(ShowBase):
         self.z_move_speed = 0.05
         self.cam_speed = 2
 
+        self.is_paused = False
+
         self.configure()
         self.create_hints()
 
@@ -51,6 +53,7 @@ class ControllableShowBase(ShowBase):
         self.addInstructions(0.95, "Q: Quit")
         self.addInstructions(0.90, "W A S D: forward, left, back, and right movement.")
         self.addInstructions(0.85, "X C: down and up movement.")
+        self.addInstructions(0.75, "Esc: Pause/Resume.")
 
     def create_light(self):
         ambientLight = AmbientLight("ambientLight")
@@ -76,6 +79,9 @@ class ControllableShowBase(ShowBase):
         self.setFrameRateMeter(True)
 
         self.configure_camera_controls()
+
+        # self.accept('window-event', self.check_focus)
+        self.accept('escape', self.pause_resume)
         # self.create_light()
 
     def create_window(self):
@@ -111,7 +117,30 @@ class ControllableShowBase(ShowBase):
         self.accept('c-up', self.set_control, [UP, OFF])
 
         self.taskMgr.add(self.move, 'moveTask')
-        # self.taskMgr.add(self.move_camera, 'moveCameraTask')
+
+    def pause_resume(self):
+        self.is_paused = not self.is_paused
+        wp = WindowProperties()
+        if self.is_paused:
+            wp.setCursorHidden(False)
+            wp.setMouseMode(WindowProperties.MAbsolute)
+            self.taskMgr.remove('moveTask')
+        else:
+            wp.setCursorHidden(True)
+            wp.setMouseMode(WindowProperties.MRelative)
+            if 'moveTask' not in [task.name for task in self.taskMgr.getTasks()]:
+                self.taskMgr.add(self.move, 'moveTask')
+        self.win.requestProperties(wp)
+
+    def check_focus(self, event):
+        # if not self.win.getProperties().foreground:
+        #     self.taskMgr.remove('moveTask')
+        #     print('removing move')
+        # else:
+        #     if not 'moveTask' in [task.name for task in self.taskMgr.getTasks()]:
+        #         self.taskMgr.add(self.move, 'moveTask')
+        #         print('adding move')
+        pass
 
     def set_control(self, direction, mode):
         self.control_map[direction] = mode
