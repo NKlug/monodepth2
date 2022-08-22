@@ -75,6 +75,17 @@ def generate_training_split_mannequin(split_filename, folder, opt):
         split_file.writelines(output)
 
 
+def generate_custom_mannequin_split(split_filename, video_path, start_index, stop_index, step):
+    os.makedirs(os.path.dirname(split_filename), exist_ok=True)
+
+    lines_to_write = []
+    for i in range(start_index, stop_index, step):
+        line = f'{video_path} {i} 0\n'
+        lines_to_write.append(line)
+    with open(split_filename, 'w') as split_file:
+        split_file.writelines(lines_to_write)
+
+
 if __name__ == '__main__':
     options = MonodepthOptions().parse()
 
@@ -99,12 +110,19 @@ if __name__ == '__main__':
     # generate_video_split_mannequin(split_filename, video_name, folder, options)
 
     # code for mannequin train
-    folder = 'validation'
-    split_filename = 'mannequin_train'
+    # folder = 'validation'
+    # split_filename = 'mannequin_train'
+    #
+    # split_filename = os.path.join(split_filename, 'test_files.txt')
+    # print(f'Generating split {split_filename}')
+    # generate_training_split_mannequin(split_filename, folder, options)
 
-    split_filename = os.path.join(split_filename, 'val_files.txt')
-    print(f'Generating split {split_filename}')
-    generate_training_split_mannequin(split_filename, folder, options)
+    # code for custom split generation
+    video_path = 'validation/00c9878266685887'
+    split_filename = 'Mannequin_00c9878266685887_custom'
+    split_filename = os.path.join(split_filename, 'test_files.txt')
+
+    generate_custom_mannequin_split(split_filename, video_path, 3600, 4200, 6)
 
     # folder = '2011_09_26/2011_09_26_drive_0001_sync'
     # split_filename = 'sequence/test_files.txt'
