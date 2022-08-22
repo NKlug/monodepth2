@@ -1,9 +1,10 @@
 # How to visualize
 
-0. Train network or use pretrained weights.
-1. Create desired data split (i.e. a sequence from a single drive) or use an existing split from the `splits` directory
+0. Make sure to `cythonize -i prepare_node.pyx` to speed up the visualization.
+1. Train network or use pretrained weights.
+2. Create desired data split (i.e. a sequence from a single drive) or use an existing split from the `splits` directory
 (e.g. '2011_09_26_drive_0001').
-2. If no precomputed predictions are available, run `predict_depth.py` locally or remotly with the desired split, i.e. 
+3. If no precomputed predictions are available, run `predict_depth.py` locally or remotly with the desired split, i.e. 
  ```
 python3 predict_depth.py
 --load_weights_folder

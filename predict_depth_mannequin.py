@@ -14,7 +14,7 @@ from utils import readlines
 splits_dir = os.path.join(os.path.dirname(__file__), "splits")
 
 
-def predict_depth_mannequin(opt):
+def predict_depth_mannequin(opt, crop=True):
     """
     Predict depth maps for given input images.
     @param opt: Options dict
@@ -85,9 +85,9 @@ def predict_depth_mannequin(opt):
     inv_Ks = np.concatenate(inv_Ks)
     color_images = np.concatenate(color_images)
 
-    # clip images and depths to get rid of black bars if they do not have the correct aspect ratio
+    # crop images and depths to get rid of black bars if they do not have the correct aspect ratio
     # correct aspect ratio is 16/9
-    if not np.isclose(width / height, 16 / 9):
+    if crop and not np.isclose(width / height, 16 / 9):
         if width > 16 / 9 * height:  # image too wide
             correct_width = round(16 / 9 * height)
             start = (width - correct_width) // 2
@@ -125,5 +125,5 @@ if __name__ == '__main__':
     options = MonodepthOptions()
     options = options.parse()
 
-    pred_depths = predict_depth_mannequin(options)
+    pred_depths = predict_depth_mannequin(options, crop=False)
     pass
