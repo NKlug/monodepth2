@@ -9,6 +9,7 @@ from panda3d.core import *
 
 from visualization.compute_3d_coordinates import compute_3d_coordinates
 from visualization.controllable_show_base import ControllableShowBase
+from visualization.prepare_node import prepare_scatter_node
 
 
 class Visualizer(ControllableShowBase):
@@ -88,9 +89,9 @@ class Visualizer(ControllableShowBase):
             raise Exception(f"Unknown coloring mode {color_mode}!")
 
         c, h, w = data['color'][0].shape
-        self.dummy_image = np.zeros((h*2, w*2, c), dtype=np.uint8)
+        self.dummy_image = np.zeros((h * 2, w * 2, c), dtype=np.uint8)
         self.texture_onscreenimage = Texture()
-        self.texture_onscreenimage.setup2dTexture(w*2, h*2, Texture.T_unsigned_byte, Texture.F_rgb)
+        self.texture_onscreenimage.setup2dTexture(w * 2, h * 2, Texture.T_unsigned_byte, Texture.F_rgb)
 
         self.nodes = [None] * len(self.coords_3d)
         self.render_single_fn = None
@@ -303,31 +304,9 @@ class Visualizer(ControllableShowBase):
         return NodePath(ls.create())
 
     def _render_frame_as_scatter(self, alpha, colors, coords_3d, scale, relative_depths,
-                                 *args, **kwargs):
-        w, h = coords_3d.shape[:2]
-        frame_node = NodePath('frame node')
-
-        for i in range(w):
-            for j in range(h):
-                if self.max_depth is not None and relative_depths[i, j] > self.max_depth:
-                    continue
-                sphere = self.loader.loadModel(self.model_path)
-                texture = self.loader.loadTexture('../assets/mono_color.rgb')
-
-                sphere.reparentTo(frame_node)
-
-                if not self.use_relative_depths:
-                    sphere.setScale(self.base_point_scale)
-                else:
-                    sphere.setScale(scale[i, j])
-                    # sphere.setScale(np.maximum(0.01, np.random.normal(0.03, 0.01)))
-
-                sphere.setTexture(texture, 1)
-                sphere.setPos(*coords_3d[i, j])
-                sphere.setTransparency(True)
-                sphere.setColor(*colors[i, j], alpha)
-
-        return frame_node
+                                *args, **kwargs):
+        return prepare_scatter_node(alpha, colors, coords_3d, scale, relative_depths, self.max_depth, self.loader,
+                                    self.model_path, self.use_relative_depths, self.base_point_scale, *args, **kwargs)
 
     def _render_three_depth_maps(self, interval_step=1, *args, **kwargs):
         old_step_num = self.step_num
