@@ -207,7 +207,7 @@ class Visualizer(ControllableShowBase):
         self.accept('b-repeat', self.previous_step, [args, kwargs])
         self.addInstructions(0.80, "B N: previous and next frame.")
 
-        self.depth_node = self.render_fn(*args, **kwargs)
+        self.depth_node = self.render_fn(*args, interval_step=interval_step, **kwargs)
         self.depth_node.reparentTo(self.root)
 
         self.camera.reparentTo(self.root)
@@ -233,6 +233,9 @@ class Visualizer(ControllableShowBase):
         """
         Renders the 3d coordinates at the current step as a point cloud.
         """
+        if self.show_2d_image:
+            self._show_2d_image()
+
         if self.nodes[self.step_num] is not None:
             return self.nodes[self.step_num]
 
@@ -284,30 +287,11 @@ class Visualizer(ControllableShowBase):
         self.onscreenimage.setPos((0, 0, 0))
         self.onscreenimage.reparentTo(self.a2dBottomLeft)
 
-    def _render_frame_as_mesh1(self, alpha, colors, coords_3d, *args, **kwargs):
-        w, h = coords_3d.shape[:2]
-        ls = LineSegs()
-        ls.setThickness(2)
-
-        for i in range(w):
-            for j in range(h):
-                ls.setColor(*colors[i, j], alpha)
-
-                if i < w - 1:
-                    ls.move_to(*coords_3d[i, j])
-                    ls.draw_to(*coords_3d[i + 1, j])
-
-                if j < h - 1:
-                    ls.move_to(*coords_3d[i, j])
-                    ls.draw_to(*coords_3d[i, j + 1])
-
-        return NodePath(ls.create())
-
     def _render_frame_as_mesh(self, alpha, colors, coords_3d, *args, **kwargs):
         return prepare_mesh_node(alpha, colors, coords_3d, *args, **kwargs)
 
     def _render_frame_as_scatter(self, alpha, colors, coords_3d, scale, relative_depths,
-                                *args, **kwargs):
+                                 *args, **kwargs):
         return prepare_scatter_node(alpha, colors, coords_3d, scale, relative_depths, self.max_depth, self.loader,
                                     self.model_path, self.use_relative_depths, self.base_point_scale, *args, **kwargs)
 
