@@ -2,6 +2,7 @@ import os
 import pickle
 
 import numpy as np
+from panda3d.core import PStatClient
 
 from options import MonodepthOptions
 from visualization.panda_visualizer import Visualizer as PandaVisualizer
@@ -11,7 +12,7 @@ if __name__ == '__main__':
     split = '2011_09_28_drive_0002'
     split = '2011_09_26_drive_0017'
     # split = '2011_09_29_drive_0026'
-    split = 'Mannequin_00c9878266685887'
+    split = 'Mannequin_00c9878266685887_custom'
     # split = None  # use split passed through cli options
 
     # parse CLI options
@@ -32,10 +33,12 @@ if __name__ == '__main__':
 
     # create visualizer with desired options
     app = PandaVisualizer(data, precompute_nodes=False, render_mode='scatter', color_mode='image', point_type='cube',
-                          global_coordinates=False, max_depth=1.5, use_relative_depths=False, downsample_factor=5,
+                          global_coordinates=False, max_depth=1.5, use_relative_depths=False, downsample_factor=8,
                           show_2d_image=True, coords_upscale=4)
 
     print(f'-> Using GPU: {app.win.gsg.driver_renderer}')
+
+    # PStatClient.connect()
 
     # visualize with steps
     app.visualize_with_steps(app.SINGLE_STEP, step_num=0, interval_step=5)

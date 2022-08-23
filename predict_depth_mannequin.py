@@ -125,5 +125,5 @@ if __name__ == '__main__':
     options = MonodepthOptions()
     options = options.parse()
 
-    pred_depths = predict_depth_mannequin(options, crop=False)
+    pred_depths = predict_depth_mannequin(options, crop=True)
     pass
