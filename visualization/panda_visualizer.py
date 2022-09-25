@@ -73,7 +73,7 @@ class Visualizer(ControllableShowBase):
             self.coords_3d -= np.min(self.coords_3d[...] - 1, axis=(0, 1, 2), keepdims=True)
 
         if point_type == 'cube':
-            self.model_path = '../assets/cube.egg'
+            self.model_path = 'assets/cube.egg'
         elif point_type == 'ball':
             self.model_path = 'smiley'
         else:

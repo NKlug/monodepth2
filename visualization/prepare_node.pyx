@@ -22,7 +22,7 @@ def prepare_scatter_node(float alpha,
             if max_depth is not None and relative_depths_view[i, j] > max_depth:
                 continue
             sphere = loader.loadModel(model_path)
-            texture = loader.loadTexture('../assets/mono_color.rgb')
+            texture = loader.loadTexture('assets/mono_color.rgb')
 
             sphere.reparentTo(frame_node)
 
