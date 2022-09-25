@@ -203,3 +203,75 @@ class MonodepthOptions:
     def parse(self):
         self.options = self.parser.parse_args()
         return self.options
+
+
+class VisualizerOptions:
+    def __init__(self):
+        self.parser = argparse.ArgumentParser(description="Visualizer options")
+
+        # PATHS
+        self.parser.add_argument("--data_path",
+                                 type=str,
+                                 help="path to the training data",
+                                 default=os.path.join(file_dir, "kitti_data"))
+
+        self.parser.add_argument("--split",
+                                 type=str,
+                                 help="which training split to use",
+                                 default="eigen_zhou")
+
+        # LOADING options
+        self.parser.add_argument("--load_weights_folder",
+                                 type=str,
+                                 help="name of model to load")
+
+        # VISUALIZER options
+        self.parser.add_argument("--precompute_nodes",
+                                 help="if set will precompute all nodes before opening the window."
+                                      "Makes loading times longer, but enables smoother rendition",
+                                 action="store_true")
+        self.parser.add_argument("--render_mode",
+                                 type=str,
+                                 help="if set will precompute all nodes before opening the window."
+                                      "Makes loading times longer, but enables smoother rendition",
+                                 default='scatter',
+                                 choices=['scatter', 'mesh'])
+        self.parser.add_argument("--color_mode",
+                                 type=str,
+                                 help="choose how the colors will be computed.",
+                                 default="image",
+                                 choices=['depth', 'image'])
+        self.parser.add_argument("--point_type",
+                                 type=str,
+                                 help="type of geometric primitive to use for a single point",
+                                 default="ball",
+                                 choices=['cube', 'ball'])
+        self.parser.add_argument("--local_coordinates",
+                                 help="choose to display points in local rather than coordinate system",
+                                 action="store_true")
+        self.parser.add_argument("--downsample_factor",
+                                 default=6,
+                                 help="factor of how much to downsample the images",
+                                 type=float)
+        self.parser.add_argument("--max_depth",
+                                 type=float,
+                                 help="point with a greater relative depth are not displayed",
+                                 default=1.5)
+        self.parser.add_argument("--relative_depths",
+                                 help="choose to use relative depths for point scaling",
+                                 action="store_true")
+        self.parser.add_argument("--base_point_scale",
+                                 type=float,
+                                 help="type of geometric primitive to use for a single point",
+                                 default=0.005)
+        self.parser.add_argument("--hide_2d_image",
+                                 help="choose to hide the 2d input image",
+                                 action='store_true')
+        self.parser.add_argument("--upscale_factor",
+                                 help="factor of how much to upscale the coordinates",
+                                 type=float,
+                                 default=1)
+
+    def parse(self):
+        self.options = self.parser.parse_args()
+        return self.options

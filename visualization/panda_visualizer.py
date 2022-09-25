@@ -32,6 +32,7 @@ class Visualizer(ControllableShowBase):
         @param use_relative_depths: Whether to scale points relative to their depth.
         @param base_point_scale: Base size of a point.
         @param show_2d_image: Whether to show the 2d image from which the current 3d points originate.
+        @param coords_upscale: Factor to scale 3d coordinates with
         """
         ControllableShowBase.__init__(self)
 

@@ -1,10 +1,7 @@
 import os
 import pickle
 
-import numpy as np
-from panda3d.core import PStatClient
-
-from options import MonodepthOptions
+from options import VisualizerOptions
 from visualization.panda_visualizer import Visualizer as PandaVisualizer
 
 if __name__ == '__main__':
@@ -16,7 +13,7 @@ if __name__ == '__main__':
     # split = None  # use split passed through cli options
 
     # parse CLI options
-    options = MonodepthOptions()
+    options = VisualizerOptions()
     opt = options.parse()
     if split is not None:
         opt.split = split
@@ -32,9 +29,18 @@ if __name__ == '__main__':
         data = pickle.load(f)
 
     # create visualizer with desired options
-    app = PandaVisualizer(data, precompute_nodes=False, render_mode='scatter', color_mode='image', point_type='cube',
-                          global_coordinates=False, max_depth=1.5, use_relative_depths=False, downsample_factor=8,
-                          show_2d_image=True, coords_upscale=4)
+    app = PandaVisualizer(data,
+                          precompute_nodes=opt.precompute_nodes,
+                          render_mode=opt.render_mode,
+                          color_mode=opt.color_mode,
+                          point_type=opt.point_type,
+                          global_coordinates=not opt.local_coordinates,
+                          max_depth=opt.max_depth,
+                          use_relative_depths=opt.relative_depths,
+                          downsample_factor=opt.downsample_factor,
+                          show_2d_image=not opt.hide_2d_image,
+                          coords_upscale=opt.upscale_factor,
+                          base_point_scale=opt.base_point_scale)
 
     print(f'-> Using GPU: {app.win.gsg.driver_renderer}')
 
